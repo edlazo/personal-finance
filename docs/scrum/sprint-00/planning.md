@@ -34,6 +34,7 @@
 | CSV de importación para Jira | ✅ |
 | Plantillas de ceremonias y de PR | ✅ |
 | `git init`, ramas `main` / `develop` y commit inicial | ✅ |
-| Crear el repo en GitHub y las reglas de protección | ⏳ requiere `gh` y nombre/visibilidad del repo |
+| Crear el repo en GitHub y subir `main`/`develop` | ✅ https://github.com/edlazo/personal-finance (privado) |
+| Reglas de protección de `main` y `develop` (rulesets, desde la web) | ⏳ PO |
 | Crear el proyecto `PF` en Jira e importar el backlog | ✅ 12 épicas + 56 ítems, Sprint 1 cargado ([mapeo](../jira-mapping.md)) |
 | Verificar la instalación de `requirements-dev.txt` en Python 3.14.8 | ⏳ requiere instalar Python 3.14.8 |
