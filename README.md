@@ -20,9 +20,9 @@ Detalle y justificación en [docs/stack.md](docs/stack.md).
 
 ## Entorno local
 ```powershell
-# 1. Python 3.14.8
-winget install Python.Python.3.14
-py -3.14 --version          # Python 3.14.8
+# 1. Python 3.14.8 (instalador de python.org; winget puede instalar otro patch)
+#    https://www.python.org/downloads/release/python-3148/
+py -3.14 --version          # debe decir Python 3.14.8
 
 # 2. Entorno virtual + dependencias
 py -3.14 -m venv .venv
