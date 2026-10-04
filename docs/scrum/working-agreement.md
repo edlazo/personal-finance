@@ -58,7 +58,8 @@ Una historia está terminada cuando:
 
 ## Jira
 - **Proyecto:** Scrum, key `PF`.
-- **Tipos de issue:** Epic, Story, Task, Bug, Spike (o Task con label `spike`).
+- **Tipos de issue:** Epic, Historia, Tarea, Subtask (más Bug, si se agrega). Los spikes son *Tarea* con el label `spike`.
+- **Sitio:** https://personal-finance-edlazo.atlassian.net. El mapeo `US-xxx` ↔ `PF-n` está en [jira-mapping.md](jira-mapping.md).
 - **Workflow:** `Backlog → To Do → In Progress → In Review → Done`.
   - *In Progress* corresponde a una rama creada.
   - *In Review* corresponde a un PR abierto.
