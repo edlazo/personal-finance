@@ -1,0 +1,329 @@
+Issue Id,Issue Type,Summary,Description,Priority,Story Points,Labels,Labels,Parent,Sprint
+1,Epic,E0 - Setup & DevOps,"Repositorio, CI/CD, Docker, Alembic, esqueleto hexagonal y observabilidad base.",High,,devops,,,
+2,Epic,E1 - Identity,"Registro, login JWT, refresh, perfil y preferencias. Aislamiento multiusuario.",High,,identity,,,
+3,Epic,E2 - Cuentas,"Cuentas en ARS/USD (caja de ahorro, efectivo, billetera, comitente, wallet cripto) con saldo derivado.",High,,accounts,,,
+4,Epic,E3 - Movimientos,"Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD).",High,,ledger,,,
+5,Epic,E4 - Cotizaciones,Cotizaciones MEP/oficial/blue/CCL/cripto automáticas y manuales; conversión ARS<->USD.,High,,fx,,,
+6,Epic,E5 - Inversiones,"Instrumentos (acciones, CEDEARs, bonos, ETFs, ONs, cripto), operaciones, posiciones y P&L.",High,,investments,,,
+7,Epic,E6 - Integraciones de mercado,"Precios desde IOL, data912 y CoinGecko; importación de Balanz.",High,,integrations,,,
+8,Epic,E7 - Tarjetas de crédito,"Tarjetas, ciclos de resumen, compras en cuotas y pagos.",High,,credit-cards,,,
+9,Epic,E8 - Deudas,Préstamos y deudas con cronograma de pagos.,High,,debts,,,
+10,Epic,E9 - Planificación,Movimientos recurrentes y presupuestos mensuales por categoría.,High,,planning,,,
+11,Epic,E10 - Reportes,"Patrimonio neto, flujo de fondos, gastos por categoría y evolución histórica.",High,,reports,,,
+12,Epic,E11 - Bienes (futuro),Inmuebles y vehículos con valuación manual incluidos en el patrimonio.,High,,assets,,,
+100,Task,"Esqueleto hexagonal, configuración y healthcheck","*Como* desarrollador, *quiero* una estructura de proyecto hexagonal por módulos con configuración tipada, *para* construir funcionalidades sobre una base consistente.
+
+h3. Criterios de aceptación
+* Existe `src/app` con `shared/` y `modules/` siguiendo domain/application/infrastructure/api
+* `Settings` (pydantic-settings) lee variables desde entorno y `.env`; existe `.env.example`
+* `create_app()` usa `lifespan` (no `on_event`)
+* `GET /health` responde 200 con estado de la app y de la base de datos
+* `pyproject.toml` configura ruff, mypy strict, pytest (`error::DeprecationWarning`), coverage e import-linter",Highest,3,devops,id-US-001,1,PF Sprint 1
+101,Task,Docker y Docker Compose para desarrollo,"*Como* desarrollador, *quiero* levantar Postgres, API y worker con un comando, *para* tener el mismo entorno en local, CI y producción.
+
+h3. Criterios de aceptación
+* `Dockerfile` multi-stage basado en `python:3.14.8-slim`, usuario no root, corre `fastapi run`
+* `docker-compose.yml` con servicios `db` (postgres:17-alpine con volumen), `api` y `worker`
+* Dado `docker compose up`, cuando termina el arranque, entonces `/health` responde 200",Highest,2,devops,id-US-002,1,PF Sprint 1
+102,Task,Alembic async y sesión de base de datos,"*Como* desarrollador, *quiero* migraciones versionadas con Alembic en modo async, *para* evolucionar el esquema de forma segura.
+
+h3. Criterios de aceptación
+* Engine y session async de SQLAlchemy 2 en `shared/infrastructure`
+* Alembic configurado con `DeclarativeBase` y convención de nombres de constraints
+* `alembic upgrade head` y `alembic check` funcionan en local y CI
+* UnitOfWork base implementado y testeado",Highest,2,devops,id-US-003,1,PF Sprint 1
+103,Task,"Pipelines de CI: lint, tipos, tests, commits y lint-fix","*Como* Product Owner, *quiero* que cada PR se verifique automáticamente, *para* garantizar calidad antes de integrar a develop/main.
+
+h3. Criterios de aceptación
+* `ci.yml`: ruff check, ruff format --check, mypy, lint-imports, pytest con cobertura >= 85% y Postgres como service, alembic check
+* `commits.yml`: válida titulo de PR (Conventional Commits + `[PF-n]`) y cada commit con commitlint
+* `lint-fix.yml`: aplica `ruff --fix` y `ruff format` y commitea `style: auto-fix lint` en PRs del mismo repo
+* `.pre-commit-config.yaml` con ruff y validación commit-msg
+* Branch protection de `main` y `develop` exige los checks",Highest,3,devops,id-US-004,1,PF Sprint 1
+104,Task,Publicación de imagen en GHCR y Dependabot,"*Como* Product Owner, *quiero* que cada merge a main publique una imagen Docker versionada, *para* tener artefactos listos para desplegar.
+
+h3. Criterios de aceptación
+* `docker.yml` construye y publica en `ghcr.io` con tags `latest`, SHA y `vX.Y.Z` en tags
+* `dependabot.yml` semanal para pip y github-actions",High,1,devops,id-US-005,1,PF Sprint 1
+105,Task,Logging estructurado y manejo de errores RFC 9457,"*Como* desarrollador, *quiero* logs JSON con request_id y errores en formato problem+json, *para* diagnosticar problemas y dar respuestas de error consistentes.
+
+h3. Criterios de aceptación
+* structlog configurado; cada request loguea método, path, status, duración y `request_id`
+* Header `X-Request-ID` propagado en la respuesta
+* Errores de dominio y validación se devuelven como `application/problem+json`",High,2,devops,id-US-053,1,PF Sprint 1
+106,Story,Registro de usuario,"*Como* usuario nuevo, *quiero* registrarme con email y contraseña, *para* tener mi propio espacio de finanzas.
+
+h3. Criterios de aceptación
+* Dado un email no registrado y contraseña válida (>= 10 caracteres), cuando hago `POST /auth/register`, entonces se crea el usuario y responde 201 sin exponer el hash
+* Dado un email ya registrado, entonces responde 409
+* La contraseña se guarda con Argon2id (pwdlib)
+* Al registrarse se crean las categorías por defecto (ver US-014) y preferencia de cotización MEP",Highest,3,identity,id-US-006,2,PF Sprint 2
+107,Story,Login con JWT,"*Como* usuario registrado, *quiero* iniciar sesión y obtener tokens, *para* acceder a mis datos de forma segura.
+
+h3. Criterios de aceptación
+* Dado credenciales válidas, `POST /auth/login` devuelve `access_token` (15 min) y `refresh_token` (7 días)
+* Dado credenciales inválidas, responde 401 sin indicar cual dato fallo
+* Los endpoints protegidos rechazan tokens vencidos o inválidos con 401",Highest,3,identity,id-US-007,2,PF Sprint 2
+108,Story,Refresh y logout,"*Como* usuario autenticado, *quiero* renovar mi sesión y cerrarla, *para* no tener que loguearme seguido y poder revocar acceso.
+
+h3. Criterios de aceptación
+* `POST /auth/refresh` emite nuevos tokens y rota el refresh (el anterior queda invalido)
+* `POST /auth/logout` revoca el refresh token actual
+* Reusar un refresh token revocado responde 401",High,2,identity,id-US-008,2,PF Sprint 2
+109,Story,Perfil y preferencias,"*Como* usuario, *quiero* ver mi perfil y elegir mi cotización por defecto, *para* ver mis reportes con el dólar que uso.
+
+h3. Criterios de aceptación
+* `GET /me` devuelve email, nombre y preferencias
+* `PATCH /me/preferences` permite elegir `default_rate_type` entre MEP, OFICIAL, BLUE, CCL, Cripto
+* Valor por defecto: MEP",Medium,2,identity,id-US-009,2,PF Sprint 2
+110,Task,Aislamiento de datos multiusuario,"*Como* usuario, *quiero* que nadie más pueda ver ni modificar mis datos, *para* proteger mi información financiera.
+
+h3. Criterios de aceptación
+* Dependencia `current_user` usada por todos los routers protegidos
+* Los repositorios filtran siempre por `user_id`
+* Test e2e: un usuario B recibe 404 al acceder a recursos del usuario A",Highest,2,identity,id-US-010,2,PF Sprint 2
+111,Story,Crear cuenta,"*Como* usuario, *quiero* crear cuentas en ARS o USD, *para* registrar donde tengo mi dinero.
+
+h3. Criterios de aceptación
+* `POST /accounts` con nombre, tipo (SAVINGS, CASH, WALLET, BROKER, CRYPTO_WALLET), moneda (ARS/USD) y saldo inicial
+* El saldo inicial usa Decimal con 2 decimales; montos negativos solo permitidos en tipos que lo admitan
+* Nombre único por usuario entre cuentas activas (409 si se repite)",Highest,3,accounts,id-US-011,3,PF Sprint 3
+112,Story,"Listar, editar y archivar cuentas","*Como* usuario, *quiero* administrar mis cuentas, *para* mantener ordenada mi información.
+
+h3. Criterios de aceptación
+* `GET /accounts` lista activas (filtro `include_archived`)
+* `PATCH /accounts/{id}` edita nombre; la moneda no se puede cambiar si tiene movimientos
+* `DELETE /accounts/{id}` archiva (soft delete); no se pueden cargar movimientos en cuentas archivadas",High,3,accounts,id-US-012,3,PF Sprint 3
+113,Story,Saldo de cuenta derivado,"*Como* usuario, *quiero* ver el saldo actual de cada cuenta, *para* saber cuánto dinero tengo.
+
+h3. Criterios de aceptación
+* El saldo = saldo inicial + suma de movimientos; no se guarda un saldo mutable
+* `GET /accounts` y `GET /accounts/{id}` incluyen `balance` en la moneda de la cuenta
+* Parametro `as_of` permite consultar el saldo a una fecha",Highest,3,accounts,id-US-013,3,PF Sprint 3
+114,Story,Categorías por defecto,"*Como* usuario nuevo, *quiero* tener categorías de ingresos y gastos precargadas, *para* empezar a registrar sin configurar nada.
+
+h3. Criterios de aceptación
+* Al registrarse se crean categorías de gasto (Supermercado, Servicios, Alquiler, Transporte, Salud, Ocio, Educación, Impuestos, Otros) e ingreso (Sueldo, Freelance, Rentas, Otros)
+* Las categorías por defecto se pueden renombrar o archivar",High,2,ledger,id-US-014,4,PF Sprint 3
+115,Story,Gestionar categorías y subcategorias,"*Como* usuario, *quiero* crear y organizar mis categorías, *para* clasificar mis movimientos a mi manera.
+
+h3. Criterios de aceptación
+* CRUD en `/categories` con tipo INCOME/EXPENSE y `parent_id` opcional (un nivel de subcategoria)
+* No se puede archivar una categoría con presupuestos activos sin confirmación
+* Nombre único por usuario, tipo y padre",Medium,3,ledger,id-US-015,4,PF Sprint 3
+116,Story,Registrar ingreso o gasto,"*Como* usuario, *quiero* registrar ingresos y gastos de mi día a día, *para* saber en que gasto y cuánto gano.
+
+h3. Criterios de aceptación
+* `POST /transactions` con cuenta, tipo (INCOME/EXPENSE), monto > 0, fecha, categoría y descripción opcional
+* La categoría debe coincidir con el tipo del movimiento (422 si no)
+* El saldo de la cuenta se actualiza en consecuencia",Highest,3,ledger,id-US-016,4,PF Sprint 4
+117,Story,Listar movimientos con filtros,"*Como* usuario, *quiero* buscar mis movimientos, *para* revisar en que gaste.
+
+h3. Criterios de aceptación
+* `GET /transactions` con filtros: rango de fechas, cuenta, categoría, tipo, texto, monto min/max
+* Paginación por cursor o limit/offset con total
+* Orden por fecha descendente por defecto",High,3,ledger,id-US-017,4,PF Sprint 4
+118,Story,Editar y eliminar movimiento,"*Como* usuario, *quiero* corregir o borrar un movimiento, *para* mantener mis datos correctos.
+
+h3. Criterios de aceptación
+* `PATCH /transactions/{id}` y `DELETE /transactions/{id}`
+* Editar o borrar una pata de una transferencia afecta a ambas patas",High,2,ledger,id-US-018,4,PF Sprint 4
+119,Story,Transferencia entre cuentas de la misma moneda,"*Como* usuario, *quiero* mover dinero entre mis cuentas, *para* reflejarlo sin que cuente como gasto ni ingreso.
+
+h3. Criterios de aceptación
+* `POST /transfers` con cuenta origen, destino, monto y fecha genera 2 movimientos ligados por `transfer_group_id`
+* Las transferencias no aparecen en reportes de ingresos/gastos
+* Origen y destino deben ser distintos y del mismo usuario",High,3,ledger,id-US-019,4,PF Sprint 4
+120,Story,Compra y venta de dólares,"*Como* usuario, *quiero* registrar compra o venta de USD entre una cuenta ARS y una USD, *para* seguir mis dolarizaciones al tipo de cambio real.
+
+h3. Criterios de aceptación
+* Transferencia entre monedas distintas requiere monto origen y monto destino (o tipo de cambio aplicado)
+* Se guarda el tipo de cambio efectivo de la operación
+* Comisión opcional registrada como gasto en categoría 'Comisiones'",High,3,ledger,id-US-020,4,PF Sprint 4
+121,Story,Cotizaciones del dólar: modelo y carga manual,"*Como* usuario, *quiero* cargar una cotización manualmente, *para* tener valores aunque falle la fuente automática.
+
+h3. Criterios de aceptación
+* Cotización con tipo (MEP, OFICIAL, BLUE, CCL, Cripto), compra, venta, fecha-hora y fuente (API/MANUAL)
+* `POST /fx/rates` para carga manual; `NUMERIC(28,10)`
+* Historial completo, no se sobreescriben valores",Highest,3,fx,id-US-021,5,PF Sprint 5
+122,Story,Cotizaciones automáticas desde dolarapi,"*Como* usuario, *quiero* que las cotizaciones se actualicen solas, *para* no cargarlas a mano.
+
+h3. Criterios de aceptación
+* Puerto `ExchangeRateProvider` y adaptador `DolarApiProvider` (oficial, blue, bolsa=MEP, contadoconliqui, cripto)
+* Job del worker cada 30 min en días hábiles 10-18 h (configurable) y 1 vez al día el resto
+* Reintentos con tenacity; si falla se loguea y se conserva el último valor
+* Tests del adaptador con respx",Highest,5,fx,id-US-022,5,PF Sprint 5
+123,Story,Consultar cotizaciones,"*Como* usuario, *quiero* consultar cotizaciones actuales e historicas, *para* saber a cuánto esta el dólar.
+
+h3. Criterios de aceptación
+* `GET /fx/rates/latest` devuelve la última de cada tipo
+* `GET /fx/rates?type=&from=&to=` devuelve el historial",High,2,fx,id-US-023,5,PF Sprint 5
+124,Story,Conversión ARS <-> USD,"*Como* usuario, *quiero* ver montos convertidos con el dólar que elija, *para* comparar todo en una misma moneda.
+
+h3. Criterios de aceptación
+* Servicio de dominio `CurrencyConverter` usa la cotización del tipo pedido más cercana a la fecha (no posterior)
+* ARS->USD usa precio de venta; USD->ARS usa precio de compra (documentado)
+* Sin cotización disponible responde error de dominio claro",Highest,3,fx,id-US-024,5,PF Sprint 5
+125,Story,Saldos consolidados en ARS y USD,"*Como* usuario, *quiero* ver el total de mis cuentas en ARS y en USD, *para* saber cuánto tengo en total.
+
+h3. Criterios de aceptación
+* `GET /accounts/summary?rate_type=` devuelve cada cuenta con saldo en ARS y USD y totales
+* Sin `rate_type` usa la preferencia del usuario",Highest,2,fx,id-US-025,5,PF Sprint 5
+126,Story,Catalogo de instrumentos,"*Como* usuario, *quiero* registrar instrumentos financieros, *para* asociar mis operaciones a ellos.
+
+h3. Criterios de aceptación
+* Instrumento: ticker, nombre, tipo (STOCK, CEDEAR, BOND, ETF, ON, CRYPTO), mercado (BYMA, NYSE, NASDAQ, CRYPTO), moneda de cotización
+* Bonos y ONs indican que cotizan cada 100 VN
+* Ticker único por mercado",High,3,investments,id-US-026,6,PF Sprint 6
+127,Story,Registrar compra y venta de instrumentos,"*Como* inversor, *quiero* registrar mis operaciones, *para* seguir mi cartera.
+
+h3. Criterios de aceptación
+* `POST /trades` con cuenta comitente/wallet, instrumento, BUY/SELL, cantidad, precio, comisión, fecha
+* Una compra debita la cuenta (precio x cantidad + comisión); una venta acredita
+* No se puede vender más cantidad que la tenencia",High,5,investments,id-US-027,6,PF Sprint 6
+128,Story,Posiciones y resultados,"*Como* inversor, *quiero* ver mis tenencias con su costo y ganancia, *para* evaluar mis inversiones.
+
+h3. Criterios de aceptación
+* `GET /positions` con cantidad, costo promedio ponderado, precio actual, valuación, P&L no realizado (monto y %)
+* P&L realizado calculado al vender
+* Valuación en moneda del instrumento y en ARS/USD",High,5,investments,id-US-028,6,PF Sprint 6
+129,Story,Carga manual de precios,"*Como* inversor, *quiero* cargar precios a mano, *para* valuar instrumentos sin fuente automática.
+
+h3. Criterios de aceptación
+* `POST /prices` con instrumento, precio, fecha; fuente MANUAL
+* La valuación usa el precio más reciente disponible",High,3,investments,id-US-029,6,PF Sprint 7
+130,Story,"Dividendos, rentas y amortizaciones","*Como* inversor, *quiero* registrar dividendos, cupones y amortizaciones, *para* medir el rendimiento total.
+
+h3. Criterios de aceptación
+* Eventos DIVIDEND, COUPON, AMORTIZATION acreditan la cuenta y se asocian al instrumento
+* Las amortizaciones reducen el VN residual del bono/ON",Medium,3,investments,id-US-030,6,PF Sprint 7
+131,Spike,Investigar API de IOL y exportación de Balanz,"*Como* equipo, *quiero* conocer endpoints, límites y formatos, *para* estimar con precisión las integraciones.
+
+h3. Criterios de aceptación
+* Documento con endpoints de IOL (auth, cotizaciones, portafolio), límites y requisitos de habilitación
+* Ejemplo anonimizado del archivo exportado de Balanz y mapeo de columnas
+* Decisión sobre openpyxl vs alternativa para leer Excel",High,2,integrations,id-US-031,7,PF Sprint 7
+132,Story,Credenciales de broker cifradas,"*Como* usuario, *quiero* guardar mis credenciales de IOL de forma segura, *para* sincronizar precios sin exponer mis datos.
+
+h3. Criterios de aceptación
+* Credenciales cifradas con Fernet; clave en variable de entorno, nunca en la base
+* Las credenciales nunca se devuelven en ninguna respuesta
+* Endpoint para borrar credenciales",High,3,integrations,id-US-032,7,PF Sprint 7
+133,Story,Precios de cripto desde CoinGecko,"*Como* inversor, *quiero* que mis cripto se valuen solas, *para* ver su valor actualizado.
+
+h3. Criterios de aceptación
+* Adaptador `CoinGeckoProvider` (puerto `PriceProvider`) para instrumentos CRYPTO
+* Job periodico; tests con respx",Medium,2,integrations,id-US-035,7,PF Sprint 7
+134,Story,Precios desde IOL,"*Como* inversor, *quiero* obtener precios de acciones, CEDEARs, bonos y ONs desde IOL, *para* valuar mi cartera automáticamente.
+
+h3. Criterios de aceptación
+* Adaptador `IolPriceProvider` con OAuth2 password grant y refresh de token
+* Job que actualiza precios de instrumentos en cartera
+* Errores de autenticación se notifican sin romper el job",High,5,integrations,id-US-033,7,PF Sprint 8
+135,Story,Precios de respaldo desde data912,"*Como* inversor, *quiero* tener precios aunque no use IOL, *para* valuar instrumentos del mercado local.
+
+h3. Criterios de aceptación
+* Adaptador `Data912Provider` para CEDEARs, bonos y ONs
+* Estrategia de proveedores configurable por prioridad (IOL > data912 > manual)",Medium,3,integrations,id-US-034,7,PF Sprint 8
+136,Story,Importar movimientos de Balanz,"*Como* inversor de Balanz, *quiero* subir el archivo exportado de Balanz, *para* no cargar mis operaciones a mano.
+
+h3. Criterios de aceptación
+* `POST /imports/balanz` acepta CSV/XLSX (max 5 MB)
+* Previsualización con filas válidas e inválidas antes de confirmar
+* Importación idempotente: reimportar el mismo archivo no duplica operaciones",Medium,5,integrations,id-US-036,7,PF Sprint 8
+137,Story,Alta de tarjeta de crédito,"*Como* usuario, *quiero* registrar mis tarjetas, *para* seguir sus consumos y vencimientos.
+
+h3. Criterios de aceptación
+* Tarjeta con nombre, red, moneda(s), día de cierre y día de vencimiento, límite opcional
+* La tarjeta es un pasivo en el patrimonio",High,2,credit-cards,id-US-037,8,PF Sprint 9
+138,Story,Compras en cuotas,"*Como* usuario, *quiero* registrar compras en cuotas, *para* saber cuánto voy a pagar en los próximos meses.
+
+h3. Criterios de aceptación
+* Compra con monto total, cantidad de cuotas y fecha; genera N cuotas asignadas a resumenes futuros según fecha de cierre
+* Compras en 1 cuota y en USD soportadas
+* `GET /credit-cards/{id}/installments` muestra cuotas pendientes",High,5,credit-cards,id-US-038,8,PF Sprint 9
+139,Story,Resumen del período,"*Como* usuario, *quiero* ver el resumen de cada período, *para* saber cuánto debo pagar y cuando.
+
+h3. Criterios de aceptación
+* `GET /credit-cards/{id}/statements/{period}` con consumos, cuotas, total ARS y USD, cierre y vencimiento",High,3,credit-cards,id-US-039,8,PF Sprint 9
+140,Story,Pago de resumen,"*Como* usuario, *quiero* registrar el pago total o parcial del resumen, *para* reflejar la deuda real de la tarjeta.
+
+h3. Criterios de aceptación
+* El pago es una transferencia desde una cuenta a la tarjeta
+* Pago parcial deja saldo pendiente en el resumen",High,3,credit-cards,id-US-040,8,PF Sprint 9
+141,Story,Registrar deuda o préstamo,"*Como* usuario, *quiero* registrar deudas y préstamos, *para* saber cuánto debo.
+
+h3. Criterios de aceptación
+* Deuda con acreedor, moneda, capital, tasa opcional, cantidad de cuotas y fecha de inicio
+* Genera cronograma de cuotas (sistema francés o cuota fija manual)
+* Préstamos otorgados a terceros se registran como activo",Medium,5,debts,id-US-041,9,PF Sprint 10
+142,Story,Pagos de deuda,"*Como* usuario, *quiero* registrar pagos de mis deudas, *para* ver el saldo pendiente.
+
+h3. Criterios de aceptación
+* Pago debita una cuenta y marca cuotas como pagadas
+* `GET /debts` muestra saldo pendiente y próxima cuota",Medium,3,debts,id-US-042,9,PF Sprint 10
+143,Story,Reglas de movimientos recurrentes,"*Como* usuario, *quiero* definir ingresos y gastos recurrentes, *para* no cargar todos los meses lo mismo.
+
+h3. Criterios de aceptación
+* CRUD `/recurring` con plantilla de movimiento y frecuencia (semanal, mensual, anual, día del mes)
+* Fecha de inicio y fin opcional; pausar/reanudar",Medium,3,planning,id-US-043,10,PF Sprint 10
+144,Story,Generación automática de recurrentes,"*Como* usuario, *quiero* que los recurrentes se registren solos, *para* mantener mis datos al día.
+
+h3. Criterios de aceptación
+* Job diario genera los movimientos vencidos de forma idempotente
+* Opción de generar como 'pendiente de confirmar'",Medium,3,planning,id-US-044,10,PF Sprint 10
+145,Story,Presupuestos mensuales,"*Como* usuario, *quiero* definir un presupuesto mensual por categoría, *para* controlar mis gastos.
+
+h3. Criterios de aceptación
+* `/budgets` con categoría, mes y monto en ARS o USD
+* Copiar presupuestos del mes anterior",Medium,3,planning,id-US-045,10,PF Sprint 11
+146,Story,Estado del presupuesto y alertas,"*Como* usuario, *quiero* ver cuánto consumi de cada presupuesto, *para* no pasarme.
+
+h3. Criterios de aceptación
+* `GET /budgets/status?month=` con presupuestado, consumido, restante y %
+* Flags de alerta al superar 80% y 100%",Medium,3,planning,id-US-046,10,PF Sprint 11
+147,Story,Patrimonio neto,"*Como* usuario, *quiero* ver mi patrimonio neto en ARS y USD, *para* saber cuánto tengo realmente.
+
+h3. Criterios de aceptación
+* `GET /reports/net-worth?currency=&rate_type=&as_of=`
+* Activos: cuentas, inversiones valuadas, préstamos otorgados; Pasivos: tarjetas, deudas
+* Desglose por tipo de activo y por moneda",High,5,reports,id-US-047,11,PF Sprint 11
+148,Story,Flujo de fondos mensual,"*Como* usuario, *quiero* ver ingresos vs gastos por mes, *para* saber si ahorro o gasto de más.
+
+h3. Criterios de aceptación
+* `GET /reports/cash-flow?from=&to=&currency=` con ingresos, gastos, ahorro y tasa de ahorro por mes
+* Excluye transferencias",High,3,reports,id-US-048,11,PF Sprint 11
+149,Story,Gastos por categoría,"*Como* usuario, *quiero* ver en que categorías gasto más, *para* identificar donde recortar.
+
+h3. Criterios de aceptación
+* `GET /reports/by-category?from=&to=&currency=` con monto y % por categoría y subcategoria",Medium,3,reports,id-US-049,11,PF Sprint 12
+150,Story,Snapshot diario de patrimonio,"*Como* usuario, *quiero* que se guarde mi patrimonio cada día, *para* ver su evolución histórica.
+
+h3. Criterios de aceptación
+* Job diario guarda patrimonio en ARS y USD por tipo de cotización
+* Idempotente por usuario y fecha",Medium,3,reports,id-US-050,11,PF Sprint 12
+151,Story,Evolución histórica,"*Como* usuario, *quiero* ver la evolución de mi patrimonio, *para* ver si mis finanzas mejoran.
+
+h3. Criterios de aceptación
+* `GET /reports/evolution?from=&to=&currency=&granularity=day|month`
+* Usa snapshots; variación absoluta y %",Medium,3,reports,id-US-051,11,PF Sprint 12
+152,Task,Hardening de seguridad,"*Como* Product Owner, *quiero* que la API este protegida ante abusos, *para* salir a producción con confianza.
+
+h3. Criterios de aceptación
+* Rate limiting en login/registro
+* Headers de seguridad y CORS configurables
+* Revisión de dependencias (pip-audit en CI) y de OWASP API Top 10",High,3,devops,id-US-052,1,PF Sprint 12
+153,Task,Preparación release v1.0.0,"*Como* Product Owner, *quiero* documentación de despliegue y release, *para* poder poner el sistema en producción.
+
+h3. Criterios de aceptación
+* README con despliegue usando la imagen de GHCR y variables de entorno
+* CHANGELOG generado desde Conventional Commits
+* Tag v1.0.0 en main",High,2,devops,id-US-054,1,PF Sprint 12
+154,Story,Registrar bienes,"*Como* usuario, *quiero* registrar inmuebles y vehículos, *para* incluirlos en mi patrimonio.
+
+h3. Criterios de aceptación
+* Bien con tipo, descripción, moneda y valuación manual con historial",Low,5,assets,id-US-055,12,
+155,Story,Bienes en el patrimonio neto,"*Como* usuario, *quiero* ver mis bienes dentro del patrimonio, *para* tener la foto completa.
+
+h3. Criterios de aceptación
+* El reporte de patrimonio incluye bienes con su última valuación",Low,3,assets,id-US-056,12,

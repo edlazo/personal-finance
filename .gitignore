@@ -1,0 +1,61 @@
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+pip-wheel-metadata/
+
+# --- Entornos virtuales -------------------------------------------------------
+.venv/
+venv/
+env/
+
+# --- Variables de entorno / secretos -----------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Tests y cobertura -----------------------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit*.xml
+
+# --- Herramientas -------------------------------------------------------------
+.mypy_cache/
+.ruff_cache/
+.import_linter_cache/
+.dmypy.json
+
+# --- IDE / Sistema operativo ---------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs -------------------------------------------------------------------
+*.log
+logs/
+
+# --- Datos locales ------------------------------------------------------------
+pgdata/
+*.sqlite
+*.sqlite3
+*.db
+# Extractos/importaciones de brokers (contienen datos financieros personales)
+imports/
+
+# --- Claude Code (configuracion local) ----------------------------------------
+.claude/settings.local.json
