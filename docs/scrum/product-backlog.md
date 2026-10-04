@@ -61,17 +61,18 @@ _Repositorio, CI/CD, Docker, Alembic, esqueleto hexagonal y observabilidad base.
 - [ ] `alembic upgrade head` y `alembic check` funcionan en local y CI
 - [ ] UnitOfWork base implementado y testeado
 
-### US-004 - Pipelines de CI: lint, tipos, tests, commits y lint-fix
+### US-004 - Pipelines de CI y hooks locales: reglas de PR, prefijos, lint, tipos y tests
 `Task` | **3 SP** | Prioridad **Highest** | Sprint 1 | label `devops`
 
 **Como** Product Owner, **quiero** que cada PR se verifique automáticamente, **para** garantizar calidad antes de integrar a develop/main.
 
 **Criterios de aceptación**
-- [ ] `ci.yml`: ruff check, ruff format --check, mypy, lint-imports, pytest con cobertura >= 85% y Postgres como service, alembic check
-- [ ] `commits.yml`: válida titulo de PR (Conventional Commits + `[PF-n]`) y cada commit con commitlint
-- [ ] `lint-fix.yml`: aplica `ruff --fix` y `ruff format` y commitea `style: auto-fix lint` en PRs del mismo repo
-- [ ] `.pre-commit-config.yaml` con ruff y validación commit-msg
-- [ ] Branch protection de `main` y `develop` exige los checks
+- [ ] Workflow `pr-checks` con jobs encadenados: pr-rules -> prefix -> lint -> typecheck/test/migrations
+- [ ] `pr-rules` (solo PRs a `develop`): exactamente 1 commit; additions + deletions <= 400 excluyendo `migrations/versions/**`, `docs/**` y `requirements*.txt`; nombre de rama `feature|fix|hotfix|chore/PF-<n>-<slug>`
+- [ ] `prefix`: titulo del PR y cada commit con prefijo en `feat, fix, refactor, perf, test, docs, style, build, ci, chore, revert`; titulo con `[PF-<n>]`
+- [ ] `lint`: `ruff check` + `ruff format --check` sin diferencias; el CI no autocorrige
+- [ ] `.pre-commit-config.yaml`: pre-commit (ruff, bloquea y muestra comando de fix), commit-msg (prefijo), pre-push (mypy + tests unitarios)
+- [ ] Rulesets de `main` y `develop` exigen los checks
 
 ### US-005 - Publicación de imagen en GHCR y Dependabot
 `Task` | **1 SP** | Prioridad **High** | Sprint 1 | label `devops`
