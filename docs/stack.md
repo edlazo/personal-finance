@@ -133,8 +133,9 @@ Todos tienen fallback de **carga manual** y en los tests se reemplazan por fakes
 ## 6. CI/CD
 | Workflow | Disparador | Jobs |
 |---|---|---|
-| `ci.yml` | PR y push a `develop`/`main` | ruff, mypy, import-linter, pytest + cobertura (Postgres service), `alembic check` |
-| `commits.yml` | PR | Título en Conventional Commits + key Jira; commitlint por commit |
-| `lint-fix.yml` | PR (mismo repo) | `ruff check --fix` + `ruff format`; commitea `style: auto-fix lint` si hay cambios |
+| `pr-checks.yml` | PR a `develop`/`main` | Encadenados: `pr-rules` (1 commit, ≤ 400 líneas, nombre de rama; solo a `develop`) → `prefix` (lista permitida + `[PF-n]`) → `lint` (ruff check/format --check) → `typecheck`, `test`, `migrations` |
+| `ci.yml` | push a `develop`/`main` | lint, mypy, import-linter, pytest + cobertura (Postgres service), `alembic check` |
+
+El CI **no autocorrige**: el lint-fix se hace localmente con los hooks de pre-commit (pre-commit, commit-msg y pre-push), que bloquean el commit o el push y muestran el comando para corregir. El CI verifica que el código subido sea idéntico a la salida de ruff, usando la misma versión fijada. Detalle en [CONTRIBUTING.md](../CONTRIBUTING.md).
 | `docker.yml` | push a `main` / tags `v*` | Build multi-stage y push a `ghcr.io` |
 | Dependabot | Semanal | pip + GitHub Actions |
