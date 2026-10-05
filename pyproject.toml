@@ -1,0 +1,74 @@
+# Solo configuración de herramientas. Las dependencias están en requirements*.txt.
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF",
+    "ASYNC", "DTZ", "PT", "S", "T20", "FAST",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+mypy_path = "src"
+explicit_package_bases = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+# FastAPI y Starlette emiten sus deprecaciones como UserWarning, por eso se listan aparte.
+filterwarnings = [
+    "error::DeprecationWarning",
+    "error::fastapi.exceptions.FastAPIDeprecationWarning",
+    "error::starlette.exceptions.StarletteDeprecationWarning",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:"]
+
+# Correr con PYTHONPATH=src (el paquete `app` vive en src/).
+[tool.importlinter]
+root_packages = ["app"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Capas hexagonales: api > infrastructure > application > domain"
+type = "layers"
+layers = ["api", "infrastructure", "application", "domain"]
+containers = ["app.shared", "app.modules.*"]
+
+[[tool.importlinter.contracts]]
+name = "domain y application no dependen de frameworks ni de librerías de infraestructura"
+type = "forbidden"
+source_modules = [
+    "app.shared.domain",
+    "app.shared.application",
+    "app.modules.*.domain",
+    "app.modules.*.application",
+]
+forbidden_modules = ["fastapi", "starlette", "sqlalchemy", "httpx", "httpx2", "app.config"]

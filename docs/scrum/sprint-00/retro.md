@@ -24,7 +24,7 @@
 4. La sesión se cortó a mitad de trabajo y quedaron dudas sobre el push inicial.
 5. `winget` instaló Python 3.14.7 en lugar de la 3.14.8.
 6. Las reglas de PR llegaron con el sprint avanzado y ampliaron PF-20.
-7. Jira no tiene el estado *En revisión*, y quedó PF-4 de ejemplo.
+7. Quedó PF-4 de ejemplo en Jira.
 8. **(PO)** Respuestas demasiado largas.
 9. **(PO)** Se ejecutaron acciones sin explicar antes qué se iba a tocar.
 
@@ -35,7 +35,9 @@
 | A2 | `pr-rules` rechaza PRs a `main` que no vengan de `develop` o `hotfix/*` | Dev | Sprint 1 (PF-20) |
 | A3 | Afirmar sobre herramientas externas solo con fuente verificada; si no, decir "no lo verifiqué" | SM/Dev | Permanente |
 | A4 | Al retomar una sesión, revisar `git status`, `git log` y el remoto antes de seguir | SM/Dev | Permanente |
-| A5 | Agregar el estado *En revisión* en Jira y borrar PF-4 | PO | Antes del Planning |
+| A5 | Borrar PF-4 de Jira | PO | ✅ Hecho |
 | A6 | README: instalar Python desde python.org con la versión exacta | Dev | ✅ Este PR |
 | A7 | Respuestas cortas y al punto | SM/Dev | Permanente |
 | A8 | Antes de tocar Jira, GitHub o hacer push, explicar qué se va a hacer | SM/Dev | Permanente |
+
+> **Corrección (Sprint 1, PF-17):** el punto 7 y la acción A5 decían que faltaba el estado *En revisión* en Jira. Ya existía, así que se quitó.

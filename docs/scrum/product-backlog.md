@@ -37,7 +37,7 @@ _Repositorio, CI/CD, Docker, Alembic, esqueleto hexagonal y observabilidad base.
 - [ ] Existe `src/app` con `shared/` y `modules/` siguiendo domain/application/infrastructure/api
 - [ ] `Settings` (pydantic-settings) lee variables desde entorno y `.env`; existe `.env.example`
 - [ ] `create_app()` usa `lifespan` (no `on_event`)
-- [ ] `GET /health` responde 200 con estado de la app y de la base de datos
+- [ ] `GET /health` responde 200 con el estado de la app (el chequeo de la base de datos pasa a US-003)
 - [ ] `pyproject.toml` configura ruff, mypy strict, pytest (`error::DeprecationWarning`), coverage e import-linter
 
 ### US-002 - Docker y Docker Compose para desarrollo
@@ -60,6 +60,7 @@ _Repositorio, CI/CD, Docker, Alembic, esqueleto hexagonal y observabilidad base.
 - [ ] Alembic configurado con `DeclarativeBase` y convención de nombres de constraints
 - [ ] `alembic upgrade head` y `alembic check` funcionan en local y CI
 - [ ] UnitOfWork base implementado y testeado
+- [ ] `GET /health` incluye el chequeo de la base de datos en `checks.database` (viene de US-001)
 
 ### US-004 - Pipelines de CI y hooks locales: reglas de PR, prefijos, lint, tipos y tests
 `Task` | **3 SP** | Prioridad **Highest** | Sprint 1 | label `devops`
@@ -297,7 +298,7 @@ _Cotizaciones MEP/oficial/blue/CCL/cripto automáticas y manuales; conversión A
 - [ ] Puerto `ExchangeRateProvider` y adaptador `DolarApiProvider` (oficial, blue, bolsa=MEP, contadoconliqui, cripto)
 - [ ] Job del worker cada 30 min en días hábiles 10-18 h (configurable) y 1 vez al día el resto
 - [ ] Reintentos con tenacity; si falla se loguea y se conserva el último valor
-- [ ] Tests del adaptador con respx
+- [ ] Tests del adaptador con `httpx2.MockTransport`
 
 ### US-023 - Consultar cotizaciones
 `Story` | **2 SP** | Prioridad **High** | Sprint 5 | label `fx`
@@ -410,7 +411,7 @@ _Precios desde IOL, data912 y CoinGecko; importación de Balanz._
 
 **Criterios de aceptación**
 - [ ] Adaptador `CoinGeckoProvider` (puerto `PriceProvider`) para instrumentos CRYPTO
-- [ ] Job periodico; tests con respx
+- [ ] Job periodico; tests con `httpx2.MockTransport`
 
 ### US-033 - Precios desde IOL
 `Story` | **5 SP** | Prioridad **High** | Sprint 8 | label `integrations`
