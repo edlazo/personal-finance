@@ -80,3 +80,7 @@ Instalación de los hooks (una sola vez): `pre-commit install` (instala los tres
 
 ## Versionado
 SemVer con tags `vMAJOR.MINOR.PATCH` sobre `main`, al cierre de los sprints que generan release (ver [roadmap](docs/scrum/roadmap.md)).
+
+Cada push a `main` publica `ghcr.io/edlazo/personal-finance:latest` y `:sha-<corto>`; cada tag `vX.Y.Z` publica `:vX.Y.Z` (workflow `docker.yml`).
+
+Dependabot abre PRs semanales a `develop` (pip y GitHub Actions) con título `build(deps): ...`.

@@ -1,0 +1,22 @@
+# Títulos `build(deps): ...` / `build(deps-dev): ...` para pasar el job `prefix` de pr-checks.
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+
+  - package-ecosystem: github-actions
+    # La acción compuesta de .github/actions también usa actions de terceros.
+    directories:
+      - /
+      - /.github/actions/setup
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
