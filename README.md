@@ -38,16 +38,26 @@ pre-commit install --hook-type pre-commit --hook-type commit-msg
 ### Levantar la API
 ```powershell
 Copy-Item .env.example .env
+# Postgres temporal hasta que PF-18 agregue docker compose
+docker run -d --name pf-db -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=personal_finance postgres:17-alpine
+alembic upgrade head
 fastapi dev src/app/main.py   # http://127.0.0.1:8000/health y /docs
 ```
-La base de datos con `docker compose up` se agrega en PF-18.
+
+### Migraciones
+```powershell
+alembic revision --autogenerate -m "crear tabla x"   # se formatea con ruff automáticamente
+alembic upgrade head
+alembic check                                        # falla si los modelos no coinciden con las migraciones
+```
 
 ### Chequeos de calidad
 ```powershell
 ruff check . ; ruff format --check .
 mypy
 $env:PYTHONPATH = "src"; lint-imports
-pytest --cov
+pytest -m "not integration"   # unitarios, sin Docker
+pytest --cov                  # todos; los de integración levantan Postgres con testcontainers
 ```
 
 ## Forma de trabajo

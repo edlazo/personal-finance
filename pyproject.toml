@@ -19,7 +19,7 @@ python_version = "3.14"
 strict = true
 mypy_path = "src"
 explicit_package_bases = true
-files = ["src", "tests"]
+files = ["src", "tests", "migrations"]
 plugins = ["pydantic.mypy"]
 
 [tool.pydantic-mypy]
@@ -40,6 +40,7 @@ filterwarnings = [
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = ["integration: necesita Docker (Postgres con testcontainers)"]
 
 [tool.coverage.run]
 source = ["src"]
@@ -72,3 +73,21 @@ source_modules = [
     "app.modules.*.application",
 ]
 forbidden_modules = ["fastapi", "starlette", "sqlalchemy", "httpx", "httpx2", "app.config"]
+
+# La URL de la base sale de Settings (DATABASE_URL); ver migrations/env.py.
+[tool.alembic]
+script_location = "%(here)s/migrations"
+file_template = "%%(year)d%%(month).2d%%(day).2d_%%(rev)s_%%(slug)s"
+prepend_sys_path = ["src"]
+
+[[tool.alembic.post_write_hooks]]
+name = "ruff_fix"
+type = "module"
+module = "ruff"
+options = "check --fix REVISION_SCRIPT_FILENAME"
+
+[[tool.alembic.post_write_hooks]]
+name = "ruff_format"
+type = "module"
+module = "ruff"
+options = "format REVISION_SCRIPT_FILENAME"

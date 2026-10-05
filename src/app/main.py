@@ -7,12 +7,19 @@ from fastapi import FastAPI
 
 from app.config import Settings, get_settings
 from app.shared.api.health import router as health_router
+from app.shared.infrastructure.database import create_engine, create_session_factory
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Recursos compartidos: se abren antes del yield y se cierran después (engine de DB en PF-19).
-    yield
+    # Recursos compartidos: se abren antes del yield y se cierran después.
+    settings: Settings = app.state.settings
+    app.state.engine = create_engine(str(settings.database_url))
+    app.state.session_factory = create_session_factory(app.state.engine)
+    try:
+        yield
+    finally:
+        await app.state.engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
