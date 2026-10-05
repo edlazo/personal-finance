@@ -24,7 +24,10 @@ pwdlib[argon2]==0.3.1
 cryptography==50.0.2
 
 # --- Integraciones externas (dolarapi, CoinGecko, IOL, data912) ------------
-httpx==0.28.1
+# httpx2 (pydantic/httpx2, verificado en PyPI el 2026-10-05) reemplaza a httpx:
+# starlette depreca el TestClient sobre httpx. httpx sigue instalado como
+# dependencia transitiva de fastapi[standard], pero el codigo no lo importa.
+httpx2==2.13.1
 tenacity==9.1.4
 
 # --- Jobs programados (cotizaciones, recurrentes, snapshots) ----------------

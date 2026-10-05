@@ -2,7 +2,7 @@
 
 Backend para gestionar finanzas personales: **activos, ingresos, gastos, inversiones, tarjetas y deudas**, con vista consolidada siempre disponible en **ARS y USD** (MEP, oficial, blue, CCL, cripto).
 
-> Estado: **Sprint 0, definición.** Todavía no hay código de producto. Ver el [roadmap](docs/scrum/roadmap.md).
+> Estado: **Sprint 1, base técnica.** Ver el [roadmap](docs/scrum/roadmap.md).
 
 ## Funcionalidades (v1.0)
 - Multiusuario con autenticación JWT.
@@ -34,7 +34,21 @@ pip check
 # 3. Hooks de git
 pre-commit install --hook-type pre-commit --hook-type commit-msg
 ```
-Las instrucciones para levantar la base de datos y la API (`docker compose up`, `fastapi dev`) se agregan en el Sprint 1.
+
+### Levantar la API
+```powershell
+Copy-Item .env.example .env
+fastapi dev src/app/main.py   # http://127.0.0.1:8000/health y /docs
+```
+La base de datos con `docker compose up` se agrega en PF-18.
+
+### Chequeos de calidad
+```powershell
+ruff check . ; ruff format --check .
+mypy
+$env:PYTHONPATH = "src"; lint-imports
+pytest --cov
+```
 
 ## Forma de trabajo
 - **Scrum**: sprints de 2 semanas gestionados en Jira (proyecto `PF`). Ver el [working agreement](docs/scrum/working-agreement.md).

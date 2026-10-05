@@ -30,7 +30,7 @@ Fuente de verdad: [`requirements.txt`](../requirements.txt) y [`requirements-dev
 | pyjwt | JWT | Mantenido y simple. Reemplaza a python-jose, que no tiene mantenimiento. |
 | pwdlib[argon2] | Hash de contraseñas | Argon2id. Reemplaza a passlib (sin mantenimiento), como recomienda FastAPI. |
 | cryptography | Cifrado simétrico (Fernet) | Guarda cifradas las credenciales de IOL de cada usuario. |
-| httpx | Cliente HTTP async | API sync/async y base del TestClient de FastAPI. Queda detrás de puertos. |
+| httpx2 | Cliente HTTP async | Sucesor de httpx (org pydantic); el TestClient de Starlette depreca httpx. Queda detrás de puertos. |
 | tenacity | Reintentos | Backoff exponencial para las APIs externas inestables. |
 | apscheduler 3.11 | Scheduler | Jobs en proceso (worker): cotizaciones, recurrentes, snapshots. Es la línea estable; la 4.x sigue en pre-release. |
 | structlog | Logging | Logs JSON estructurados con contexto (request_id, user_id). |
@@ -45,7 +45,7 @@ Fuente de verdad: [`requirements.txt`](../requirements.txt) y [`requirements-dev
 | pre-commit | Hooks locales: ruff fix/format y validación de commit-msg. |
 | pytest, pytest-asyncio, pytest-cov | Tests async con cobertura mínima del 85%. |
 | testcontainers[postgres] | PostgreSQL real y efímero en tests de integración. |
-| respx | Mock de httpx para los adaptadores (dolarapi, IOL, etc.). |
+| httpx2.MockTransport | Mock HTTP para los adaptadores (dolarapi, IOL, etc.). Reemplaza a respx, que solo soporta httpx. |
 | polyfactory | Fábricas de datos de prueba a partir de modelos Pydantic y dataclasses. |
 
 ### Descartados (deprecados o redundantes)
@@ -67,7 +67,7 @@ Fuente de verdad: [`requirements.txt`](../requirements.txt) y [`requirements-dev
 Esto se garantiza con `filterwarnings = ["error::DeprecationWarning"]` en pytest y con las reglas `UP` (pyupgrade) de ruff.
 
 ### Puntos a vigilar
-- **httpx**: sin release desde 2024-12, pero el repo está activo. Si se discontinúa, se reemplaza el adaptador sin tocar el dominio.
+- **httpx → httpx2** (Sprint 1, PF-17): Starlette depreca su TestClient sobre httpx. httpx sigue instalado como dependencia transitiva de `fastapi[standard]`, pero el código usa solo httpx2.
 - **openpyxl**: sin release desde 2024-06; es estable. Se reevalúa en el spike de import Balanz (Sprint 6).
 
 ## 3. Arquitectura: Hexagonal por módulos
@@ -84,7 +84,7 @@ HTTP ──▶   │   application (casos de uso, DTOs)  ──▶  domain (enti
 ```
 
 **Reglas de dependencia** (verificadas por import-linter):
-1. `domain` no importa nada de FastAPI, SQLAlchemy, httpx ni de otras capas.
+1. `domain` no importa nada de FastAPI, SQLAlchemy, httpx2 ni de otras capas.
 2. `application` depende solo de `domain`.
 3. `infrastructure` y `api` dependen de `application` / `domain`, nunca al revés.
 4. Un módulo usa a otro **solo a través de su capa `application`**, nunca de sus modelos ORM.
