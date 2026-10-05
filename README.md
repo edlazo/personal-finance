@@ -32,7 +32,7 @@ pip install -r requirements-dev.txt
 pip check
 
 # 3. Hooks de git
-pre-commit install --hook-type pre-commit --hook-type commit-msg
+pre-commit install          # pre-commit, commit-msg y pre-push (con el venv activado)
 ```
 
 ### Levantar todo con Docker

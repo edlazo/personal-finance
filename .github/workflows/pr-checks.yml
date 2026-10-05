@@ -1,0 +1,92 @@
+# Reglas de PR (CONTRIBUTING.md). Jobs encadenados: pr-rules -> prefix -> quality.
+name: pr-checks
+
+on:
+  pull_request:
+    branches: [develop, main]
+    # edited: vuelve a validar cuando cambia el título.
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  HEAD_REF: ${{ github.head_ref }}
+  AUTHOR: ${{ github.event.pull_request.user.login }}
+
+jobs:
+  pr-rules:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: origin (a main solo desde develop o hotfix/*)
+        if: github.base_ref == 'main'
+        run: |
+          if [[ "$HEAD_REF" != develop && "$HEAD_REF" != hotfix/* ]]; then
+            echo "::error::A main solo llegan PRs desde develop o hotfix/*, no desde '$HEAD_REF'."
+            exit 1
+          fi
+
+      - name: single-commit
+        if: github.base_ref == 'develop'
+        env:
+          COMMITS: ${{ github.event.pull_request.commits }}
+        run: |
+          if (( COMMITS != 1 )); then
+            echo "::error::El PR tiene $COMMITS commits y debe tener 1. Corregí con: git commit --amend y git push --force-with-lease."
+            exit 1
+          fi
+
+      - name: size (additions + deletions <= 400)
+        if: github.base_ref == 'develop'
+        run: |
+          lines=$(git diff --numstat "$BASE_SHA...$HEAD_SHA" -- . \
+            ':!migrations/versions' ':!docs' ':!requirements*.txt' \
+            | awk '{ total += $1 + $2 } END { print total + 0 }')
+          echo "additions + deletions: $lines (máximo 400)"
+          if (( lines > 400 )); then
+            echo "::error::El PR tiene $lines líneas (máximo 400). Dividilo en PRs más chicos."
+            exit 1
+          fi
+
+      - name: branch-name
+        if: github.base_ref == 'develop' && github.event.pull_request.user.login != 'dependabot[bot]'
+        run: |
+          if [[ ! "$HEAD_REF" =~ ^(feature|fix|hotfix|chore)/PF-[0-9]+-[a-z0-9-]+$ ]]; then
+            echo "::error::La rama '$HEAD_REF' no respeta feature|fix|hotfix|chore/PF-<n>-<slug>."
+            exit 1
+          fi
+
+  prefix:
+    needs: pr-rules
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Título del PR
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          key="--require-key"
+          [[ "$AUTHOR" == "dependabot[bot]" ]] && key=""
+          python3 scripts/check_commit_msg.py $key "$TITLE"
+
+      - name: Commits del PR
+        run: |
+          mapfile -t subjects < <(git log --no-merges --format=%s "$BASE_SHA..$HEAD_SHA")
+          python3 scripts/check_commit_msg.py "${subjects[@]}"
+
+  quality:
+    needs: prefix
+    uses: ./.github/workflows/quality.yml

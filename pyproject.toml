@@ -3,7 +3,7 @@
 [tool.ruff]
 target-version = "py314"
 line-length = 100
-src = ["src", "tests"]
+src = ["src", "tests", "scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -13,13 +13,14 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
+"scripts/**" = ["T201"]
 
 [tool.mypy]
 python_version = "3.14"
 strict = true
-mypy_path = "src"
+mypy_path = "src,scripts"
 explicit_package_bases = true
-files = ["src", "tests", "migrations"]
+files = ["src", "tests", "migrations", "scripts"]
 plugins = ["pydantic.mypy"]
 
 # APScheduler 3.x no publica tipos (py.typed).
@@ -35,7 +36,7 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 # FastAPI y Starlette emiten sus deprecaciones como UserWarning, por eso se listan aparte.
 filterwarnings = [
@@ -48,7 +49,7 @@ asyncio_default_fixture_loop_scope = "function"
 markers = ["integration: necesita Docker (Postgres con testcontainers)"]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "scripts"]
 branch = true
 
 [tool.coverage.report]
