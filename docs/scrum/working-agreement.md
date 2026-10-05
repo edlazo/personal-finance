@@ -46,7 +46,7 @@ Una historia puede entrar a un sprint si:
 Una historia está terminada cuando:
 - [ ] El código está en `feature/PF-<n>-<slug>` y mergeado a `develop` vía PR (squash).
 - [ ] El título del PR es un Conventional Commit con la key de Jira, por ejemplo `feat(accounts): crear cuenta [PF-14]`.
-- [ ] El CI está en verde: ruff, ruff format, mypy `--strict`, import-linter, pytest con cobertura ≥ 85 %, `alembic check` y commitlint.
+- [ ] El CI está en verde: ruff, ruff format, mypy `--strict`, import-linter, pytest con cobertura ≥ 85 %, `alembic check` y prefijo de commits.
 - [ ] Sin `DeprecationWarning`: pytest falla si aparece alguno.
 - [ ] Hay tests unitarios de dominio y tests de integración/e2e del endpoint.
 - [ ] Incluye la migración de Alembic, si cambia el esquema.

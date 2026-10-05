@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
@@ -11,6 +12,10 @@ POSTGRES_IMAGE = "postgres:17-alpine"
 
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
+    # En el CI la base es un service de GitHub Actions; en local, un contenedor efímero.
+    if url := os.environ.get("TEST_DATABASE_URL"):
+        yield url
+        return
     with PostgresContainer(POSTGRES_IMAGE, driver="asyncpg") as postgres:
         yield postgres.get_connection_url()
 

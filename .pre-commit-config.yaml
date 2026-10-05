@@ -1,0 +1,41 @@
+# Hooks locales: usan las herramientas del venv (mismas versiones que el CI).
+# Instalar: pre-commit install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
+# Requiere el venv activado al commitear y pushear.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: "ruff check (para corregir: ruff check --fix .)"
+        entry: ruff check --no-fix
+        language: system
+        types: [python]
+        stages: [pre-commit]
+
+      - id: ruff-format
+        name: "ruff format --check (para corregir: ruff format .)"
+        entry: ruff format --check
+        language: system
+        types: [python]
+        stages: [pre-commit]
+
+      - id: commit-prefix
+        name: "prefijo Conventional Commit"
+        entry: python scripts/check_commit_msg.py --file
+        language: system
+        stages: [commit-msg]
+
+      - id: mypy
+        name: mypy --strict
+        entry: mypy
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: unit-tests
+        name: tests unitarios
+        entry: pytest -m "not integration" -x -q
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

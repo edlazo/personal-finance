@@ -50,10 +50,13 @@ Se ejecutan en este orden. Si una falla, las siguientes no corren.
 |---|---|---|---|
 | 1 | `pr-rules / single-commit` | El PR tiene **exactamente 1 commit**. Para corregir, se hace `git commit --amend` y luego `git push --force-with-lease`. | PRs a `develop` |
 | 2 | `pr-rules / size` | **additions + deletions ≤ 400**. No cuentan `migrations/versions/**`, `docs/**` ni `requirements*.txt`. | PRs a `develop` |
-| 3 | `pr-rules / branch-name` | La rama respeta `feature|fix|hotfix|chore/PF-<n>-<slug>`. | PRs a `develop` |
+| 3 | `pr-rules / branch-name` | La rama respeta `feature|fix|hotfix|chore/PF-<n>-<slug>`. Dependabot está exento. | PRs a `develop` |
+| — | `pr-rules / origin` | A `main` solo llegan PRs desde `develop` o `hotfix/*`. | PRs a `main` |
 | 4 | `prefix` | El prefijo del **título del PR y de cada commit** está en la lista permitida (ver abajo) y el título incluye `[PF-<n>]`. Dependabot está exento de la key. | Todos |
 | 5 | `lint` | `ruff check` + `ruff format --check` sin cambios: el código subido tiene que ser idéntico a lo que produciría el linter (misma versión de ruff fijada en `requirements-dev.txt`). | Todos |
-| 6 | `typecheck`, `test`, `migrations` | mypy, import-linter, pytest con cobertura, `alembic check`. | Todos |
+| 6 | `typecheck`, `test`, `migrations` | mypy, import-linter, pytest con cobertura ≥ 85 % (Postgres como service), `alembic upgrade head` + `alembic check`. | Todos |
+
+Los checks 5 y 6 viven en el workflow reutilizable `quality.yml`, que también corre en cada push a `develop` y `main` (`ci.yml`). El prefijo se valida con [`scripts/check_commit_msg.py`](scripts/check_commit_msg.py), el mismo script del hook `commit-msg`.
 
 **Prefijos permitidos:** `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `style`, `build`, `ci`, `chore`, `revert`.
 
@@ -73,7 +76,7 @@ Para corregir el lint:
 ruff check --fix . ; ruff format .
 git add -A ; git commit --amend --no-edit
 ```
-Instalación de los hooks (una sola vez): `pre-commit install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push`.
+Instalación de los hooks (una sola vez): `pre-commit install` (instala los tres tipos). Los hooks usan las herramientas del venv, así que hay que commitear y pushear con el venv activado.
 
 ## Versionado
 SemVer con tags `vMAJOR.MINOR.PATCH` sobre `main`, al cierre de los sprints que generan release (ver [roadmap](docs/scrum/roadmap.md)).

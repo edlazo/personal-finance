@@ -1,0 +1,77 @@
+# Checks de calidad reutilizables: los llaman pr-checks.yml y ci.yml.
+# El CI solo verifica; la corrección se hace en local (ver CONTRIBUTING.md).
+name: quality
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/personal_finance
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14.8"
+      - name: Instalar ruff (versión de requirements-dev.txt)
+        run: pip install "$(grep -E '^ruff==' requirements-dev.txt)"
+      - run: ruff check --no-fix --output-format=github .
+      - run: ruff format --check --diff .
+
+  typecheck:
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: mypy
+      - run: lint-imports
+        env:
+          PYTHONPATH: src
+
+  test:
+    needs: lint
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: personal_finance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pytest --cov
+        env:
+          TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+
+  migrations:
+    needs: lint
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: personal_finance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: alembic upgrade head
+      - run: alembic check
