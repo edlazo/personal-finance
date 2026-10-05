@@ -22,6 +22,11 @@ explicit_package_bases = true
 files = ["src", "tests", "migrations"]
 plugins = ["pydantic.mypy"]
 
+# APScheduler 3.x no publica tipos (py.typed).
+[[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
@@ -50,7 +55,7 @@ branch = true
 fail_under = 85
 show_missing = true
 skip_covered = true
-exclude_also = ["if TYPE_CHECKING:"]
+exclude_also = ["if TYPE_CHECKING:", "if __name__ == .__main__.:"]
 
 # Correr con PYTHONPATH=src (el paquete `app` vive en src/).
 [tool.importlinter]

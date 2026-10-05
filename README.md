@@ -35,13 +35,20 @@ pip check
 pre-commit install --hook-type pre-commit --hook-type commit-msg
 ```
 
-### Levantar la API
+### Levantar todo con Docker
+```powershell
+docker compose up -d --build --wait   # db, migraciones, api y worker
+curl http://localhost:8000/health     # {"status":"ok","checks":{"database":"ok"}}
+docker compose down                   # los datos quedan en el volumen pgdata (-v para borrarlos)
+```
+
+### Desarrollar la API con recarga automática
 ```powershell
 Copy-Item .env.example .env
-# Postgres temporal hasta que PF-18 agregue docker compose
-docker run -d --name pf-db -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=personal_finance postgres:17-alpine
+docker compose up -d --wait db
 alembic upgrade head
 fastapi dev src/app/main.py   # http://127.0.0.1:8000/health y /docs
+python -m app.worker          # worker de jobs (con PYTHONPATH=src)
 ```
 
 ### Migraciones
