@@ -4,7 +4,13 @@ import asyncio
 import contextlib
 import signal
 
+import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+from app.config import get_settings
+from app.shared.infrastructure.logging import configure_logging
+
+logger = structlog.get_logger()
 
 
 def create_scheduler() -> AsyncIOScheduler:
@@ -15,13 +21,16 @@ def create_scheduler() -> AsyncIOScheduler:
 async def run(stop: asyncio.Event) -> None:
     scheduler = create_scheduler()
     scheduler.start()
+    logger.info("worker_started")
     try:
         await stop.wait()
     finally:
         scheduler.shutdown()
+        logger.info("worker_stopped")
 
 
 async def serve() -> None:
+    configure_logging(json_logs=get_settings().environment != "local")
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     # En Windows no hay signal handlers en asyncio; ahí Ctrl+C corta con KeyboardInterrupt.
