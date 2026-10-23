@@ -7,7 +7,7 @@
 # --- Framework web ---------------------------------------------------------
 # El extra [standard] incluye fastapi-cli (`fastapi dev` / `fastapi run`) y el
 # servidor ASGI uvicorn. No se declara ni se invoca uvicorn directamente.
-fastapi[standard]==0.143.0
+fastapi[standard]==0.156.2
 pydantic==2.14.1
 pydantic-settings==2.15.0
 email-validator==2.3.0
