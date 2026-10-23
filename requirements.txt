@@ -28,7 +28,7 @@ cryptography==50.0.2
 # starlette depreca el TestClient sobre httpx. httpx sigue instalado como
 # dependencia transitiva de fastapi[standard], pero el codigo no lo importa.
 httpx2==2.13.1
-tenacity==9.1.4
+tenacity==9.2.1
 
 # --- Jobs programados (cotizaciones, recurrentes, snapshots) ----------------
 apscheduler==3.11.3
