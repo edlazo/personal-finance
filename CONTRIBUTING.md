@@ -49,7 +49,7 @@ Se ejecutan en este orden. Si una falla, las siguientes no corren.
 | # | Check | Regla | Aplica a |
 |---|---|---|---|
 | 1 | `pr-rules / single-commit` | El PR tiene **exactamente 1 commit**. Para corregir, se hace `git commit --amend` y luego `git push --force-with-lease`. | PRs a `develop` |
-| 2 | `pr-rules / size` | **additions + deletions ≤ 400**. No cuentan `migrations/versions/**`, `docs/**` ni `requirements*.txt`. | PRs a `develop` |
+| 2 | `pr-rules / size` | **additions + deletions ≤ 400**. No cuentan `migrations/versions/**`, `docs/**`, `requirements*.txt` ni `frontend/package-lock.json`. | PRs a `develop` |
 | 3 | `pr-rules / branch-name` | La rama respeta `feature|fix|hotfix|chore/PF-<n>-<slug>`. Dependabot está exento. | PRs a `develop` |
 | — | `pr-rules / origin` | A `main` solo llegan PRs desde `develop` o `hotfix/*`. | PRs a `main` |
 | 4 | `prefix` | El prefijo del **título del PR y de cada commit** está en la lista permitida (ver abajo) y el título incluye `[PF-<n>]`. Dependabot está exento de la key. | Todos |
