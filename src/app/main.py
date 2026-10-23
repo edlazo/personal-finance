@@ -7,7 +7,10 @@ from fastapi import FastAPI
 
 from app.config import Settings, get_settings
 from app.shared.api.health import router as health_router
+from app.shared.api.middleware import request_logging
+from app.shared.api.problems import register_problem_handlers
 from app.shared.infrastructure.database import create_engine, create_session_factory
+from app.shared.infrastructure.logging import configure_logging
 
 
 @asynccontextmanager
@@ -24,8 +27,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    configure_logging(json_logs=settings.environment != "local")
     app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
     app.state.settings = settings
+    app.middleware("http")(request_logging)
+    register_problem_handlers(app)
     app.include_router(health_router)
     return app
 
