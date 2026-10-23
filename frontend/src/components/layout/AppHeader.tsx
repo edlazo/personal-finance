@@ -3,15 +3,8 @@ import { Bell, Search } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { initials } from '@/lib/utils'
 import type { User } from '@/mocks/user'
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('')
-}
 
 export function AppHeader({ user }: { user: User }) {
   return (
