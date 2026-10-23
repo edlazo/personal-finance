@@ -1,13 +1,11 @@
+import { BudgetDonut } from '@/components/dashboard/BudgetDonut'
+import { KpiCard } from '@/components/dashboard/KpiCard'
+import { NetWorthChart } from '@/components/dashboard/NetWorthChart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { mockDashboard, type DashboardSummary } from '@/mocks/dashboard'
 
-// Lugares de los módulos; PF-78 y PF-79 los reemplazan por el contenido real.
-const MODULES = [
-  'Patrimonio neto',
-  'Ingresos del mes',
-  'Gastos del mes',
-  'Dólar MEP',
-  'Evolución del patrimonio',
-  'Presupuesto del mes',
+// Módulos de PF-79, todavía sin contenido.
+const PENDING_MODULES = [
   'Perfil',
   'Tarjeta de crédito',
   'Últimos movimientos',
@@ -16,10 +14,18 @@ const MODULES = [
   'Inversiones',
 ]
 
-export function Dashboard() {
+export function Dashboard({ summary = mockDashboard }: { summary?: DashboardSummary }) {
   return (
     <section aria-label="Resumen" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {MODULES.map((title) => (
+      <div className="grid gap-4 md:col-span-2 md:grid-cols-2 lg:col-span-3 xl:grid-cols-4">
+        <KpiCard title="Patrimonio neto" kpi={summary.netWorth} higherIsBetter />
+        <KpiCard title="Ingresos del mes" kpi={summary.monthIncome} higherIsBetter />
+        <KpiCard title="Gastos del mes" kpi={summary.monthExpenses} higherIsBetter={false} />
+        <KpiCard title="Dólar MEP (venta)" kpi={summary.mepRate} highlighted />
+      </div>
+      <NetWorthChart history={summary.netWorthHistory} />
+      <BudgetDonut spent={summary.budget.spent} limit={summary.budget.limit} />
+      {PENDING_MODULES.map((title) => (
         <Card key={title} className="rounded-3xl">
           <CardHeader>
             <CardTitle>{title}</CardTitle>
