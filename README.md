@@ -51,6 +51,15 @@ fastapi dev src/app/main.py   # http://127.0.0.1:8000/health y /docs
 python -m app.worker          # worker de jobs (con PYTHONPATH=src)
 ```
 
+### Frontend
+```powershell
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+npm run lint ; npm run format:check ; npm run typecheck ; npm test
+```
+React + Vite + TypeScript y Tailwind CSS 4; lint con oxlint y formato con Prettier.
+
 ### Migraciones
 ```powershell
 alembic revision --autogenerate -m "crear tabla x"   # se formatea con ruff automáticamente

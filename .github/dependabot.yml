@@ -10,6 +10,14 @@ updates:
       prefix: build
       include: scope
 
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+
   - package-ecosystem: github-actions
     # La acción compuesta de .github/actions también usa actions de terceros.
     directories:

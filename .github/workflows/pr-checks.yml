@@ -50,7 +50,7 @@ jobs:
         if: github.base_ref == 'develop'
         run: |
           lines=$(git diff --numstat "$BASE_SHA...$HEAD_SHA" -- . \
-            ':!migrations/versions' ':!docs' ':!requirements*.txt' \
+            ':!migrations/versions' ':!docs' ':!requirements*.txt' ':!frontend/package-lock.json' \
             | awk '{ total += $1 + $2 } END { print total + 0 }')
           echo "additions + deletions: $lines (máximo 400)"
           if (( lines > 400 )); then
