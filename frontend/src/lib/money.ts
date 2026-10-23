@@ -4,8 +4,12 @@ export type Currency = 'ARS' | 'USD'
 export type Money = { amount: string; currency: Currency }
 
 // shortcut: Number() solo para mostrar; exacto hasta ~15 dígitos, pasar a un decimal si se calcula con montos.
-export function formatMoney({ amount, currency }: Money): string {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency }).format(Number(amount))
+export function formatMoney({ amount, currency }: Money, signed = false): string {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency,
+    signDisplay: signed ? 'exceptZero' : 'auto',
+  }).format(Number(amount))
 }
 
 /** Variación relativa entre dos montos de la misma moneda; null si no hay base para comparar. */

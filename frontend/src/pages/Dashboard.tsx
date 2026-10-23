@@ -1,20 +1,19 @@
 import { BudgetDonut } from '@/components/dashboard/BudgetDonut'
+import { CreditCardWidget } from '@/components/dashboard/CreditCardWidget'
 import { KpiCard } from '@/components/dashboard/KpiCard'
 import { NetWorthChart } from '@/components/dashboard/NetWorthChart'
+import { ProfileCard } from '@/components/dashboard/ProfileCard'
+import { RecentTransactions } from '@/components/dashboard/RecentTransactions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { mockDashboard, type DashboardSummary } from '@/mocks/dashboard'
+import { mockUser, type User } from '@/mocks/user'
 
 // Módulos de PF-79, todavía sin contenido.
-const PENDING_MODULES = [
-  'Perfil',
-  'Tarjeta de crédito',
-  'Últimos movimientos',
-  'Seguridad',
-  'Gastos por categoría',
-  'Inversiones',
-]
+const PENDING_MODULES = ['Seguridad', 'Gastos por categoría', 'Inversiones']
 
-export function Dashboard({ summary = mockDashboard }: { summary?: DashboardSummary }) {
+type Props = { summary?: DashboardSummary; user?: User }
+
+export function Dashboard({ summary = mockDashboard, user = mockUser }: Props) {
   return (
     <section aria-label="Resumen" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       <div className="grid gap-4 md:col-span-2 md:grid-cols-2 lg:col-span-3 xl:grid-cols-4">
@@ -25,6 +24,9 @@ export function Dashboard({ summary = mockDashboard }: { summary?: DashboardSumm
       </div>
       <NetWorthChart history={summary.netWorthHistory} />
       <BudgetDonut spent={summary.budget.spent} limit={summary.budget.limit} />
+      <ProfileCard user={user} />
+      <CreditCardWidget card={summary.creditCard} />
+      <RecentTransactions transactions={summary.recentTransactions} />
       {PENDING_MODULES.map((title) => (
         <Card key={title} className="rounded-3xl">
           <CardHeader>

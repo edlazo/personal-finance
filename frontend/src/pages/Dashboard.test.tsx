@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
+import { formatMoney, type Money } from '@/lib/money'
 import { mockDashboard } from '@/mocks/dashboard'
 
 import { Dashboard } from './Dashboard'
@@ -40,4 +41,27 @@ test('la dona muestra el porcentaje usado y lo pasado de presupuesto', () => {
 
   render(<Dashboard summary={over} />)
   expect(screen.getByText('108,1%')).toBeInTheDocument()
+})
+
+const ars = (amount: string): Money => ({ amount, currency: 'ARS' })
+// Testing Library normaliza el texto del DOM (espacio duro → espacio) pero no lo que se busca.
+const shown = (money: Money, signed = false) => formatMoney(money, signed).replace(/ /g, ' ')
+
+test('el perfil y la tarjeta de crédito muestran los datos del usuario', () => {
+  render(<Dashboard />)
+
+  expect(screen.getByText('elias@example.com')).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'VISA terminada en 4821' })).toBeInTheDocument()
+  expect(screen.getByText(shown(ars('1650000')))).toBeInTheDocument()
+  expect(screen.getByText('Cierra 29 oct · vence 10 nov')).toBeInTheDocument()
+})
+
+test('los últimos movimientos muestran el signo según el tipo y linkean a Movimientos', () => {
+  render(<Dashboard />)
+
+  expect(screen.getByText(shown(ars('2350000'), true))).toHaveClass('text-primary')
+  expect(screen.getByText(shown(ars('-84500'), true))).toBeInTheDocument()
+  // Las transferencias entre cuentas no suman ni restan: van sin signo.
+  expect(screen.getByText(shown(ars('300000')))).toHaveClass('text-muted-foreground')
+  expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', '/movimientos')
 })
