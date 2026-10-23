@@ -19,6 +19,7 @@ Las ramas, los commits y los PRs usan la **key de Jira** (`PF-n`), no el ID `US-
 | E9 Planificación | PF-14 |
 | E10 Reportes | PF-15 |
 | E11 Bienes (futuro) | PF-16 |
+| E12 Frontend | PF-75 |
 
 ## Historias y tareas
 | Sprint | Backlog → Jira |
@@ -36,6 +37,7 @@ Las ramas, los commits y los PRs usan la **key de Jira** (`PF-n`), no el ID `US-
 | 11 | US-045 → PF-62 · US-046 → PF-63 · US-047 → PF-64 · US-048 → PF-65 |
 | 12 | US-049 → PF-66 · US-050 → PF-67 · US-051 → PF-68 · US-052 → PF-69 · US-054 → PF-70 |
 | Futuro | US-055 → PF-71 · US-056 → PF-72 |
+| E12 (sin sprint) | US-057 → PF-76 · US-058 → PF-77 · US-059 → PF-78 · US-060 → PF-79 |
 
 ## Notas de configuración
 - Los tipos disponibles son Epic, Historia, Tarea y Subtask. Los **spikes** se cargan como *Tarea* con el label `spike`.

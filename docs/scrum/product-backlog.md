@@ -23,6 +23,7 @@
 | **PF-E9** Planificación | Movimientos recurrentes y presupuestos mensuales por categoría. | 4 | 12 |
 | **PF-E10** Reportes | Patrimonio neto, flujo de fondos, gastos por categoría y evolución histórica. | 5 | 17 |
 | **PF-E11** Bienes (futuro) | Inmuebles y vehículos con valuación manual incluidos en el patrimonio. | 2 | 8 |
+| **PF-E12** Frontend | SPA React + Vite + TS en `frontend/`: dashboard con datos mock tipados (agregada en la Review del Sprint 1). | 4 | 16 |
 
 ## PF-E0 - Setup & DevOps
 
@@ -614,3 +615,33 @@ _Inmuebles y vehículos con valuación manual incluidos en el patrimonio._
 **Criterios de aceptación**
 - [ ] El reporte de patrimonio incluye bienes con su última valuación
 
+## PF-E12 - Frontend
+_Agregada el 2026-10-23 (Review del Sprint 1) a pedido del PO. Diseño de referencia: dashboard de tarjetas blancas sobre gris claro con acento verde._
+
+### US-057 - Esqueleto del frontend y CI
+`Task` | **3 SP** | Prioridad **Highest** | label `frontend` | Jira PF-76
+
+- [ ] `frontend/` con Vite + React + TypeScript strict, Tailwind CSS 4 y componentes shadcn/ui
+- [ ] ESLint + Prettier (check, sin autocorrección en CI) y Vitest + Testing Library
+- [ ] Job `frontend` en `quality.yml`: lint, typecheck, test y build
+- [ ] `pr-rules` excluye `frontend/package-lock.json` del límite de 400 líneas
+- [ ] Dependabot semanal para npm en `frontend/`
+
+### US-058 - Layout del dashboard
+`Story` | **3 SP** | Prioridad **High** | label `frontend` | Jira PF-77
+
+- [ ] Sidebar de íconos (Dashboard, Cuentas, Movimientos, Inversiones, Tarjetas, Reportes, Configuración, Salir) y header con saludo, búsqueda, notificaciones y avatar
+- [ ] Grilla de tarjetas responsive (3/2/1 columnas), accesible por teclado y con contraste AA
+
+### US-059 - Dashboard: KPIs, evolución del patrimonio y presupuesto
+`Story` | **5 SP** | Prioridad **High** | label `frontend` | Jira PF-78
+
+- [ ] KPIs: patrimonio neto, ingresos y gastos del mes, dólar MEP (destacada), con variación vs el mes anterior
+- [ ] Gráfico de evolución del patrimonio (12 meses, ARS/USD) y dona de presupuesto usado
+- [ ] Montos con `Intl.NumberFormat` es-AR; datos mock tipados con la forma de la API
+
+### US-060 - Dashboard: tarjetas, movimientos, seguridad, gastos e inversiones
+`Story` | **5 SP** | Prioridad **Medium** | label `frontend` | Jira PF-79
+
+- [ ] Perfil, tarjeta de crédito (disponible y próximo resumen), últimos 5 movimientos, seguridad (2FA y sesiones), gastos por categoría e inversiones (valor y P&L)
+- [ ] Datos mock tipados
