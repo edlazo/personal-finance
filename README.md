@@ -58,7 +58,7 @@ npm install
 npm run dev          # http://localhost:5173
 npm run lint ; npm run format:check ; npm run typecheck ; npm test
 ```
-React + Vite + TypeScript y Tailwind CSS 4; lint con oxlint y formato con Prettier.
+React + Vite + TypeScript, Tailwind CSS 4, shadcn/ui; lint con oxlint y formato con Prettier.
 
 ### Migraciones
 ```powershell
