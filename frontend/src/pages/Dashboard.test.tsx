@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
 import { formatMoney, type Money } from '@/lib/money'
@@ -64,4 +64,29 @@ test('los últimos movimientos muestran el signo según el tipo y linkean a Movi
   // Las transferencias entre cuentas no suman ni restan: van sin signo.
   expect(screen.getByText(shown(ars('300000')))).toHaveClass('text-muted-foreground')
   expect(screen.getByRole('link', { name: 'Ver todos' })).toHaveAttribute('href', '/movimientos')
+})
+
+test('seguridad avisa si la verificación en dos pasos está desactivada', () => {
+  render(<Dashboard />)
+
+  expect(screen.getByText('Desactivada: te recomendamos activarla')).toBeInTheDocument()
+  expect(screen.getByText('2')).toBeInTheDocument()
+})
+
+test('los gastos por categoría van de mayor a menor con su porcentaje', () => {
+  render(<Dashboard />)
+  const list = within(screen.getByRole('list', { name: 'Gastos por categoría' }))
+  const items = list.getAllByRole('listitem')
+
+  expect(items[0]).toHaveTextContent('Vivienda')
+  expect(items[0]).toHaveTextContent('41,9%')
+  expect(items.at(-1)).toHaveTextContent('Ocio')
+})
+
+test('inversiones muestra el valor de la cartera y el resultado en verde si es positivo', () => {
+  render(<Dashboard />)
+  const pnl = screen.getByText(/de resultado/)
+
+  expect(pnl).toHaveTextContent(`${shown(ars('800000'), true)} (+14,8%) de resultado`)
+  expect(pnl).toHaveClass('text-primary')
 })
