@@ -8,7 +8,7 @@
 # El extra [standard] incluye fastapi-cli (`fastapi dev` / `fastapi run`) y el
 # servidor ASGI uvicorn. No se declara ni se invoca uvicorn directamente.
 fastapi[standard]==0.143.0
-pydantic==2.13.5
+pydantic==2.14.1
 pydantic-settings==2.15.0
 email-validator==2.3.0
 python-multipart==0.0.32
