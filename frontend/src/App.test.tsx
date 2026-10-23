@@ -24,7 +24,7 @@ test('el header saluda al usuario y tiene búsqueda, notificaciones y avatar', (
   expect(within(screen.getByRole('banner')).getByText('EL')).toBeInTheDocument()
 })
 
-test('hay un atajo al contenido y el dashboard muestra los módulos pendientes', () => {
+test('hay un atajo al contenido y el dashboard ya no tiene módulos pendientes', () => {
   render(<App />)
 
   expect(screen.getByRole('link', { name: 'Ir al contenido' })).toHaveAttribute(
@@ -32,5 +32,5 @@ test('hay un atajo al contenido y el dashboard muestra los módulos pendientes',
     '#contenido',
   )
   const resumen = within(screen.getByRole('region', { name: 'Resumen' }))
-  expect(resumen.getAllByText('Próximamente')).toHaveLength(3)
+  expect(resumen.queryByText('Próximamente')).not.toBeInTheDocument()
 })

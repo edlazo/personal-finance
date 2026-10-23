@@ -25,6 +25,13 @@ export type Transaction = {
   amount: Money
 }
 
+export type SecurityStatus = { twoFactorEnabled: boolean; activeSessions: number }
+
+export type CategoryExpense = { category: string; amount: Money }
+
+/** `pnl` lo calcula la API (Decimal); el front solo lo muestra. */
+export type InvestmentsSummary = { value: Money; cost: Money; pnl: Money }
+
 // Forma esperada de `GET /dashboard/summary` (Reportes); hasta entonces, datos de ejemplo.
 export type DashboardSummary = {
   netWorth: Kpi
@@ -35,6 +42,9 @@ export type DashboardSummary = {
   budget: { spent: Money; limit: Money }
   creditCard: CreditCardSummary
   recentTransactions: Transaction[]
+  security: SecurityStatus
+  expensesByCategory: CategoryExpense[]
+  investments: InvestmentsSummary
 }
 
 const ars = (amount: string): Money => ({ amount, currency: 'ARS' })
@@ -109,4 +119,13 @@ export const mockDashboard: DashboardSummary = {
       amount: ars('32000.00'),
     },
   ],
+  security: { twoFactorEnabled: false, activeSessions: 2 },
+  expensesByCategory: [
+    { category: 'Vivienda', amount: ars('620000.00') },
+    { category: 'Comida', amount: ars('410000.00') },
+    { category: 'Transporte', amount: ars('180000.00') },
+    { category: 'Servicios', amount: ars('150000.00') },
+    { category: 'Ocio', amount: ars('120000.00') },
+  ],
+  investments: { value: ars('6200000.00'), cost: ars('5400000.00'), pnl: ars('800000.00') },
 }
