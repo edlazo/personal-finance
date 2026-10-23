@@ -4,3 +4,10 @@ import { afterEach } from 'vitest'
 
 // Sin `globals` de Vitest, Testing Library no desmonta solo entre tests.
 afterEach(cleanup)
+
+// jsdom no tiene ResizeObserver y el ResponsiveContainer de Recharts lo necesita.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
