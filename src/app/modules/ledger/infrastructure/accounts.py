@@ -1,11 +1,11 @@
 """Tabla, repositorio y Unit of Work de las cuentas del ledger."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, Index, Numeric, String, func, select, text, update
+from sqlalchemy import DateTime, Enum, Index, Numeric, String, case, func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
@@ -16,6 +16,7 @@ from app.modules.ledger.domain.account import (
     AccountType,
     same_name,
 )
+from app.modules.ledger.domain.category import CategoryKind
 from app.modules.ledger.infrastructure.transactions import TransactionModel
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import Base
@@ -99,6 +100,25 @@ class SqlAlchemyAccountRepository(UserScopedRepository[AccountModel]):
             TransactionModel.user_id == self.user_id, TransactionModel.account_id == account_id
         )
         return await self.session.scalar(select(movements.exists())) or False
+
+    async def movement_totals(
+        self, account_ids: list[UUID], *, as_of: date | None
+    ) -> dict[UUID, Decimal]:
+        signed = case(
+            (TransactionModel.kind == CategoryKind.INCOME, TransactionModel.amount),
+            else_=-TransactionModel.amount,
+        )
+        query = (
+            select(TransactionModel.account_id, func.sum(signed))
+            .where(
+                TransactionModel.user_id == self.user_id,
+                TransactionModel.account_id.in_(account_ids),
+            )
+            .group_by(TransactionModel.account_id)
+        )
+        if as_of is not None:
+            query = query.where(TransactionModel.date <= as_of)
+        return dict((await self.session.execute(query)).tuples().all())
 
     async def add(self, account: Account) -> None:
         self.session.add(

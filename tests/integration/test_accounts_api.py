@@ -117,6 +117,7 @@ def test_a_user_gets_404_on_another_users_accounts(
     account_id = create(client, ana).json()["id"]
 
     assert client.get("/accounts", headers=beto).json() == []
+    assert client.get(f"/accounts/{account_id}", headers=beto).status_code == 404
     assert (
         client.patch(f"/accounts/{account_id}", headers=beto, json={"name": "Mía"}).status_code
         == 404

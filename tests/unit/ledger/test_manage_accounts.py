@@ -5,6 +5,7 @@ import pytest
 
 from app.modules.ledger.application.manage_accounts import (
     ArchiveAccount,
+    GetAccount,
     ListAccounts,
     UpdateAccount,
 )
@@ -71,10 +72,22 @@ async def test_list_hides_archived_unless_asked(uow: FakeAccountsUnitOfWork) -> 
     add(uow, "Galicia")
     add(uow, "Viejo banco").archive()
 
-    assert [a.name for a in await ListAccounts(uow=uow)()] == ["Galicia"]
+    assert [a.account.name for a in await ListAccounts(uow=uow)()] == ["Galicia"]
     assert len(await ListAccounts(uow=uow)(include_archived=True)) == 2
 
 
 async def test_unknown_account_is_not_found(uow: FakeAccountsUnitOfWork) -> None:
     with pytest.raises(NotFoundError):
         await ArchiveAccount(uow=uow)(uuid4())
+
+
+async def test_balance_is_the_initial_balance_plus_movements(uow: FakeAccountsUnitOfWork) -> None:
+    galicia = Account(USER, "Galicia", AccountType.SAVINGS, Currency.ARS, Decimal("1000.00"))
+    efectivo = add(uow, "Efectivo")
+    uow.accounts.items[galicia.id] = galicia
+    uow.accounts.totals[galicia.id] = Decimal("299.50")
+
+    balances = {a.account.name: a.balance for a in await ListAccounts(uow=uow)()}
+
+    assert balances == {"Galicia": Decimal("1299.50"), "Efectivo": Decimal("0")}
+    assert (await GetAccount(uow=uow)(efectivo.id)).balance == Decimal("0")

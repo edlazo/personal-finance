@@ -1,5 +1,7 @@
 """Dobles en memoria para los casos de uso de cuentas."""
 
+from datetime import date
+from decimal import Decimal
 from types import TracebackType
 from typing import Self
 from uuid import UUID
@@ -12,6 +14,13 @@ class InMemoryAccounts:
     def __init__(self) -> None:
         self.items: dict[UUID, Account] = {}
         self.with_movements: set[UUID] = set()
+        # shortcut: totales fijos que ignoran as_of; el filtro por fecha se prueba contra Postgres.
+        self.totals: dict[UUID, Decimal] = {}
+
+    async def movement_totals(
+        self, account_ids: list[UUID], *, as_of: date | None
+    ) -> dict[UUID, Decimal]:
+        return {i: self.totals[i] for i in account_ids if i in self.totals}
 
     async def has_movements(self, account_id: UUID) -> bool:
         return account_id in self.with_movements
