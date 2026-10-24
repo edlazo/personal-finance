@@ -1,0 +1,96 @@
+from collections.abc import Callable, Iterator
+from typing import Any
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+from httpx2 import Response
+from pydantic import PostgresDsn
+
+from app.config import Settings
+from app.main import create_app
+
+pytestmark = pytest.mark.integration
+
+PASSWORD = "clave-larga-123"
+
+
+@pytest.fixture
+def client(migrated_database_url: str) -> Iterator[TestClient]:
+    settings = Settings(
+        _env_file=None, environment="test", database_url=PostgresDsn(migrated_database_url)
+    )
+    with TestClient(create_app(settings)) as client:
+        yield client
+
+
+@pytest.fixture
+def sign_up(client: TestClient) -> Callable[[], dict[str, str]]:
+    def create() -> dict[str, str]:
+        email = f"movimientos-{uuid4().hex[:8]}@example.com"
+        client.post("/auth/register", json={"email": email, "password": PASSWORD, "name": "Ana"})
+        login = client.post("/auth/login", json={"email": email, "password": PASSWORD})
+        return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    return create
+
+
+def setup(client: TestClient, auth: dict[str, str]) -> tuple[str, dict[str, str]]:
+    """Crea una cuenta y devuelve su id y las categorías por nombre y tipo."""
+    account = client.post(
+        "/accounts", headers=auth, json={"name": "Galicia", "type": "SAVINGS", "currency": "ARS"}
+    )
+    categories = {
+        f"{c['kind']}:{c['name']}": c["id"] for c in client.get("/categories", headers=auth).json()
+    }
+    return account.json()["id"], categories
+
+
+def expense(
+    client: TestClient, auth: dict[str, str], account_id: str, category_id: str, **fields: Any
+) -> Response:
+    body = {
+        "account_id": account_id,
+        "kind": "EXPENSE",
+        "amount": "1500.50",
+        "date": "2026-10-24",
+        "category_id": category_id,
+        "description": "Compra del mes",
+    }
+    return client.post("/transactions", headers=auth, json=body | fields)
+
+
+def test_register_an_expense_and_its_rules(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    account_id, categories = setup(client, auth)
+    supermercado = categories["EXPENSE:Supermercado"]
+
+    created = expense(client, auth, account_id, supermercado)
+    wrong_kind = expense(client, auth, account_id, categories["INCOME:Sueldo"])
+    zero = expense(client, auth, account_id, supermercado, amount="0")
+    currency = client.patch(f"/accounts/{account_id}", headers=auth, json={"currency": "USD"})
+    client.delete(f"/accounts/{account_id}", headers=auth)
+    archived = expense(client, auth, account_id, supermercado)
+
+    assert created.status_code == 201
+    assert created.json()["amount"] == "1500.50"
+    assert wrong_kind.status_code == 422
+    assert wrong_kind.json()["detail"] == "La categoría no coincide con el tipo del movimiento"
+    assert zero.status_code == 422
+    assert currency.status_code == 409
+    assert archived.status_code == 422
+
+
+def test_another_users_account_is_404_and_a_token_is_required(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    ana, beto = sign_up(), sign_up()
+    account_id, _ = setup(client, ana)
+    _, beto_categories = setup(client, beto)
+
+    response = expense(client, beto, account_id, beto_categories["EXPENSE:Supermercado"])
+
+    assert response.status_code == 404
+    assert expense(client, {}, account_id, str(uuid4())).status_code == 401
