@@ -9,24 +9,26 @@ Sprints de **2 semanas**. Capacidad estimada: **~13 SP por sprint** (unas 17 h n
 | 0 | — | Definir stack, requirements, marco Scrum y backlog; preparar repo y Jira | Definición | — | — |
 | 1 | 1–2 | Base técnica lista: esqueleto hexagonal, Docker, Alembic y CI/CD | US-001, 002, 003, 004, 005 | 13 | — |
 | 2 | — (2026-10-23) | Dashboard navegable con datos de ejemplo y logging estructurado | US-057, 058, 059, 060, 053 | 18 | — |
-| 3 | 3–4 | Usuarios pueden registrarse y autenticarse de forma segura | US-006, 007, 008, 009, 010 | 12 | — |
-| 4 | 5–6 | Gestionar cuentas ARS/USD con saldo y categorías | US-011, 012, 013, 014, 015 | 14 | — |
-| 5 | 7–8 | Registrar ingresos, gastos, transferencias y compra/venta de USD | US-016, 017, 018, 019, 020 | 14 | — |
-| 6 | 9–10 | Ver todo en ARS y USD con cotizaciones automáticas | US-021, 022, 023, 024, 025 | 15 | **v0.1.0 MVP** |
-| 7 | 11–12 | Seguir la cartera de inversiones con posiciones y P&L | US-026, 027, 028 | 13 | — |
-| 8 | 13–14 | Precios manuales, rentas, credenciales seguras y cripto automática | US-029, 030, 031, 032, 035 | 13 | — |
-| 9 | 15–16 | Valuación automática con IOL/data912 e import de Balanz | US-033, 034, 036 | 13 | **v0.2.0** |
-| 10 | 17–18 | Controlar tarjetas de crédito, cuotas y resúmenes | US-037, 038, 039, 040 | 13 | — |
-| 11 | 19–20 | Deudas y movimientos recurrentes automáticos | US-041, 042, 043, 044 | 14 | **v0.3.0** |
-| 12 | 21–22 | Presupuestos, patrimonio neto y flujo de fondos | US-045, 046, 047, 048 | 14 | — |
-| 13 | 23–24 | Reportes históricos, hardening y salida a producción | US-049, 050, 051, 052, 054 | 14 | **v1.0.0** |
+| 3 | — (2026-10-23) | Usuarios pueden registrarse y autenticarse de forma segura | US-006, 007, 008, 009, 010 + PF-80 | 13 | — |
+| 4 | 3–4 | Gestionar cuentas ARS/USD y categorías, y entrar con login real | US-011, 012, 014, 015, 061 | 14 | — |
+| 5 | 5–6 | Registrar ingresos, gastos, transferencias y compra/venta de USD, con saldo derivado | US-013, 016, 017, 018, 019, 020 | 17 | — |
+| 6 | 7–8 | Ver todo en ARS y USD con cotizaciones automáticas | US-021, 022, 023, 024, 025 | 15 | **v0.1.0 MVP** |
+| 7 | 9–10 | Seguir la cartera de inversiones con posiciones y P&L | US-026, 027, 028 | 13 | — |
+| 8 | 11–12 | Precios manuales, rentas, credenciales seguras y cripto automática | US-029, 030, 031, 032, 035 | 13 | — |
+| 9 | 13–14 | Valuación automática con IOL/data912 e import de Balanz | US-033, 034, 036 | 13 | **v0.2.0** |
+| 10 | 15–16 | Controlar tarjetas de crédito, cuotas y resúmenes | US-037, 038, 039, 040 | 13 | — |
+| 11 | 17–18 | Deudas y movimientos recurrentes automáticos | US-041, 042, 043, 044 | 14 | **v0.3.0** |
+| 12 | 19–20 | Presupuestos, patrimonio neto y flujo de fondos | US-045, 046, 047, 048 | 14 | — |
+| 13 | 21–22 | Reportes históricos, hardening y salida a producción | US-049, 050, 051, 052, 054 | 14 | **v1.0.0** |
 | Futuro | — | Bienes (inmuebles, vehículos) | US-055, 056 | 8 | v1.1.0 |
 
-**Total v1.0:** 179 SP en 13 sprints, unas 24 semanas desde el inicio del Sprint 1.
+**Total v1.0:** 182 SP en 13 sprints, unas 22 semanas desde el inicio del Sprint 1.
 
 > **2026-10-23 (Planning del Sprint 2):** entra la épica PF-E12 Frontend; el PO prioriza el dashboard, así que todo el roadmap desde Identity se corre un sprint.
 >
 > **2026-10-23 (Review del Sprint 2):** el Sprint 2 se completó el mismo día de su Planning, antes de su inicio previsto (26/10), con 18 SP (sumó US-060). El Sprint 3 toma sus fechas (26/10 → 06/11), así que el calendario vuelve a la planificación original: v0.1.0 al cierre de la semana 10.
+>
+> **2026-10-23 (Review del Sprint 3):** el Sprint 3 también se completó el día de su Planning (13 SP). El Sprint 4 toma sus fechas (26/10 → 06/11) y suma US-061 (login en el front); US-013 (saldo derivado) pasa al Sprint 5 porque depende de los movimientos. El Sprint 5 queda en 17 SP: hay que re-planificarlo. v0.1.0 al cierre de la semana 8.
 
 ## Releases
 | Versión | Contenido | Valor para el usuario |

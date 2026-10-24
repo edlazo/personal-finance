@@ -18,7 +18,7 @@
 - El CI pasó en verde en su primer run, y los PRs de Dependabot lo pasan sin intervención.
 - La regla de 400 líneas funcionó: PF-19 se dividió en dos PRs en lugar de mergear uno grande.
 - Explicar antes de tocar Jira o GitHub (acción A8 del Sprint 0) se cumplió en las transiciones de Jira.
-- _(PO) a completar._
+- _(PO) sin aportes (confirmado en el cierre del Sprint 3)._
 
 ## Qué no salió bien (mejorar)
 1. PF-19 se commiteó con 494 líneas y recién después se detectó que superaba el límite; hubo que rehacer el commit en dos.
@@ -27,7 +27,7 @@
 4. Sin `gh` ni sesión de GitHub en el navegador integrado, los PRs se abren a mano.
 5. La Review y la Retro se hicieron una semana después del cierre del sprint.
 6. Siguen pendientes: checks requeridos en los rulesets y `pre-commit install`.
-7. _(PO) a completar._
+7. _(PO) sin aportes (confirmado en el cierre del Sprint 3)._
 
 ## Acciones
 | # | Acción | Responsable | Para cuándo |
