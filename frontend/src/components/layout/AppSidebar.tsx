@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { useAuth } from '@/lib/auth-context'
 import { cn } from '@/lib/utils'
 
 type NavItem = { label: string; href: string; icon: LucideIcon }
@@ -28,6 +29,7 @@ const itemClass =
   'flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50'
 
 export function AppSidebar({ currentPath = '/' }: { currentPath?: string }) {
+  const { logout } = useAuth()
   return (
     <nav
       aria-label="Principal"
@@ -51,8 +53,12 @@ export function AppSidebar({ currentPath = '/' }: { currentPath?: string }) {
           </a>
         )
       })}
-      {/* El cierre de sesión real llega con Identity (Sprint 3). */}
-      <button type="button" title="Salir" className={cn(itemClass, 'md:mt-auto')}>
+      <button
+        type="button"
+        title="Salir"
+        onClick={() => void logout()}
+        className={cn(itemClass, 'md:mt-auto')}
+      >
         <LogOut aria-hidden className="size-5" />
         <span className="sr-only">Salir</span>
       </button>

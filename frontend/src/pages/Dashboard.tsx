@@ -8,11 +8,11 @@ import { ProfileCard } from '@/components/dashboard/ProfileCard'
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions'
 import { SecurityCard } from '@/components/dashboard/SecurityCard'
 import { mockDashboard, type DashboardSummary } from '@/mocks/dashboard'
-import { mockUser, type User } from '@/mocks/user'
+import type { Profile } from '@/lib/auth-context'
 
-type Props = { summary?: DashboardSummary; user?: User }
+type Props = { summary?: DashboardSummary; user: Profile }
 
-export function Dashboard({ summary = mockDashboard, user = mockUser }: Props) {
+export function Dashboard({ summary = mockDashboard, user }: Props) {
   return (
     <section aria-label="Resumen" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       <div className="grid gap-4 md:col-span-2 md:grid-cols-2 lg:col-span-3 xl:grid-cols-4">

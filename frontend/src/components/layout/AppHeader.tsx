@@ -4,9 +4,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { initials } from '@/lib/utils'
-import type { User } from '@/mocks/user'
+import type { Profile } from '@/lib/auth-context'
 
-export function AppHeader({ user }: { user: User }) {
+export function AppHeader({ user }: { user: Profile }) {
   return (
     <header className="flex flex-wrap items-center gap-3">
       <div className="mr-auto">
