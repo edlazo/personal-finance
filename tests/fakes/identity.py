@@ -2,8 +2,9 @@
 
 from types import TracebackType
 from typing import Self
+from uuid import UUID
 
-from app.modules.identity.domain.user import User
+from app.modules.identity.domain.user import TokenPair, User
 
 
 class InMemoryUsers:
@@ -50,3 +51,11 @@ class FakeHasher:
     async def verify(self, password: str, password_hash: str | None) -> bool:
         self.verified_hashes.append(password_hash)
         return password_hash == f"hashed:{password}"
+
+
+class FakeTokens:
+    def issue(self, user_id: UUID) -> TokenPair:
+        return TokenPair(f"access-{user_id}", f"refresh-{user_id}", expires_in=900)
+
+    def decode_access(self, token: str) -> UUID:
+        return UUID(token.removeprefix("access-"))
