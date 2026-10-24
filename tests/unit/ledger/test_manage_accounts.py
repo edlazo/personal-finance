@@ -3,12 +3,12 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.accounts.application.manage_accounts import (
+from app.modules.ledger.application.manage_accounts import (
     ArchiveAccount,
     ListAccounts,
     UpdateAccount,
 )
-from app.modules.accounts.domain.account import (
+from app.modules.ledger.domain.account import (
     Account,
     AccountArchivedError,
     AccountNameTakenError,

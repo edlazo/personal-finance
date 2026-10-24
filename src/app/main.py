@@ -6,9 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import Settings, get_settings
-from app.modules.accounts.api.routes import router as accounts_router
 from app.modules.identity.api.routes import me_router
 from app.modules.identity.api.routes import router as auth_router
+from app.modules.ledger.api.accounts import router as accounts_router
 from app.modules.ledger.api.routes import router as categories_router
 from app.shared.api.health import router as health_router
 from app.shared.api.middleware import request_logging

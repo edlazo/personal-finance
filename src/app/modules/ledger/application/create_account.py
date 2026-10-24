@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from app.modules.accounts.domain.account import (
+from app.modules.ledger.domain.account import (
     Account,
     AccountNameTakenError,
     AccountRepository,

@@ -1,1 +1,1 @@
-"""Ledger: categorías, ingresos, gastos y transferencias."""
+"""Ledger: cuentas, categorías, ingresos, gastos y transferencias."""

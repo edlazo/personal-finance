@@ -1,4 +1,4 @@
-"""Tabla, repositorio y Unit of Work de cuentas."""
+"""Tabla, repositorio y Unit of Work de las cuentas del ledger."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.modules.accounts.domain.account import (
+from app.modules.ledger.domain.account import (
     Account,
     AccountNameTakenError,
     AccountType,

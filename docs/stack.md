@@ -99,8 +99,7 @@ src/app/
 ├─ shared/            # kernel: Money, Currency, RateType, errores, Clock, UnitOfWork, paginación
 └─ modules/
    ├─ identity/       # usuarios, auth JWT, preferencias
-   ├─ accounts/       # cuentas ARS/USD: ahorro, efectivo, billetera, broker, wallet cripto
-   ├─ ledger/         # transacciones, categorías, transferencias
+   ├─ ledger/         # cuentas ARS/USD, categorías, transacciones y transferencias (accounts se unió acá en el Sprint 5: cuentas y movimientos se validan en la misma transacción)
    ├─ fx/             # cotizaciones (MEP, oficial, blue, CCL, cripto)
    ├─ investments/    # instrumentos, trades, posiciones, precios
    ├─ credit_cards/   # tarjetas, resúmenes, cuotas

@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.modules.accounts.application.create_account import AccountsUnitOfWork
-from app.modules.accounts.domain.account import Account, AccountNameTakenError
+from app.modules.ledger.application.create_account import AccountsUnitOfWork
+from app.modules.ledger.domain.account import Account, AccountNameTakenError
 from app.shared.domain.money import Currency
 
 
