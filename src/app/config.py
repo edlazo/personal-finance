@@ -1,10 +1,13 @@
 """Configuración tipada, leída desde variables de entorno y `.env`."""
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import PostgresDsn
+from pydantic import Field, PostgresDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Solo para desarrollo: el validador de Settings lo rechaza en producción.
+DEV_JWT_SECRET = "solo-para-desarrollo-no-usar-en-produccion"  # noqa: S105
 
 
 class Settings(BaseSettings):
@@ -19,6 +22,17 @@ class Settings(BaseSettings):
     database_url: PostgresDsn = PostgresDsn(
         "postgresql+asyncpg://postgres:postgres@localhost:5432/personal_finance"
     )
+    # HS256 pide al menos 32 bytes de clave (RFC 7518, sección 3.2).
+    jwt_secret: SecretStr = Field(default=SecretStr(DEV_JWT_SECRET), min_length=32)
+    access_token_minutes: int = 15
+    refresh_token_days: int = 7
+
+    @model_validator(mode="after")
+    def _require_real_secret_in_production(self) -> Self:
+        using_dev_secret = self.jwt_secret.get_secret_value() == DEV_JWT_SECRET
+        if self.environment == "production" and using_dev_secret:
+            raise ValueError("JWT_SECRET es obligatorio en producción")
+        return self
 
 
 @lru_cache

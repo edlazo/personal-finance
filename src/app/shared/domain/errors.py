@@ -11,3 +11,7 @@ class NotFoundError(DomainError):
 
 class ConflictError(DomainError):
     """La operación choca con el estado actual (por ejemplo, un email ya registrado)."""
+
+
+class UnauthorizedError(DomainError):
+    """Falta autenticación o no es válida (401 en la API)."""

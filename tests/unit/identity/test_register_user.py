@@ -1,51 +1,10 @@
-from types import TracebackType
-from typing import Self
-
 import pytest
 
 from app.modules.identity.application.register_user import RegisterUser
-from app.modules.identity.domain.user import EmailAlreadyRegisteredError, User
+from app.modules.identity.domain.user import EmailAlreadyRegisteredError
 from app.modules.identity.infrastructure.persistence import Argon2PasswordHasher
 from app.shared.domain.rates import RateType
-
-
-class InMemoryUsers:
-    def __init__(self) -> None:
-        self.by_email: dict[str, User] = {}
-
-    async def get_by_email(self, email: str) -> User | None:
-        return self.by_email.get(email)
-
-    async def add(self, user: User) -> None:
-        self.by_email[user.email] = user
-
-
-class FakeUnitOfWork:
-    def __init__(self) -> None:
-        self.users = InMemoryUsers()
-        self.committed = False
-
-    async def __aenter__(self) -> Self:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None:
-        pass
-
-    async def commit(self) -> None:
-        self.committed = True
-
-    async def rollback(self) -> None:
-        pass
-
-
-class FakeHasher:
-    async def hash(self, password: str) -> str:
-        return f"hashed:{password}"
+from fakes.identity import FakeHasher, FakeUnitOfWork
 
 
 @pytest.fixture
@@ -80,3 +39,13 @@ async def test_argon2_hasher_uses_argon2id() -> None:
 
     assert password_hash.startswith("$argon2id$")
     assert "clave-larga-123" not in password_hash
+
+
+async def test_argon2_verify() -> None:
+    hasher = Argon2PasswordHasher()
+    password_hash = await hasher.hash("clave-larga-123")
+
+    assert await hasher.verify("clave-larga-123", password_hash)
+    assert not await hasher.verify("otra-clave-456", password_hash)
+    # Sin hash (usuario inexistente) igual calcula, pero nunca valida.
+    assert not await hasher.verify("clave-larga-123", None)
