@@ -27,7 +27,7 @@ async def ensure_default_categories(uow: LedgerUnitOfWork, user_id: UUID) -> Non
 class ListCategories:
     uow: LedgerUnitOfWork
 
-    async def __call__(self, user_id: UUID) -> list[Category]:
+    async def __call__(self, user_id: UUID, *, include_archived: bool = False) -> list[Category]:
         async with self.uow:
             await ensure_default_categories(self.uow, user_id)
-            return await self.uow.categories.list_categories()
+            return await self.uow.categories.list_categories(include_archived=include_archived)
