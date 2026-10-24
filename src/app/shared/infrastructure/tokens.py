@@ -2,12 +2,12 @@
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
 import jwt
 
-from app.shared.domain.auth import InvalidTokenError, TokenPair
+from app.shared.domain.auth import InvalidTokenError, RefreshClaims, TokenPair
 
 ALGORITHM = "HS256"
 
@@ -27,30 +27,46 @@ class JwtTokenService:
 
     def issue(self, user_id: UUID) -> TokenPair:
         now = self._clock()
+        refresh = RefreshClaims(user_id, uuid4().hex, now + self._refresh_ttl)
         return TokenPair(
-            access_token=self._encode(user_id, "access", now, self._access_ttl),
-            refresh_token=self._encode(user_id, "refresh", now, self._refresh_ttl),
+            access_token=self._encode(user_id, "access", now, now + self._access_ttl, uuid4().hex),
+            refresh_token=self._encode(user_id, "refresh", now, refresh.expires_at, refresh.jti),
             expires_in=int(self._access_ttl.total_seconds()),
+            refresh=refresh,
         )
 
     def decode_access(self, token: str) -> UUID:
+        return UUID(self._decode(token, "access")["sub"])
+
+    def decode_refresh(self, token: str) -> RefreshClaims:
+        claims = self._decode(token, "refresh")
+        return RefreshClaims(
+            UUID(claims["sub"]), claims["jti"], datetime.fromtimestamp(claims["exp"], UTC)
+        )
+
+    def _decode(self, token: str, kind: Literal["access", "refresh"]) -> dict[str, Any]:
         try:
-            claims = jwt.decode(
+            claims: dict[str, Any] = jwt.decode(
                 token,
                 self._secret,
                 algorithms=[ALGORITHM],
-                options={"require": ["exp", "iat", "sub"]},
+                options={"require": ["exp", "iat", "sub", "jti"]},
             )
-            # Un refresh token no sirve para llamar a la API.
-            if claims.get("type") != "access":
+            # Un refresh no sirve para llamar a la API, ni un access para renovar la sesión.
+            if claims.get("type") != kind:
                 raise InvalidTokenError
-            return UUID(claims["sub"])
+            UUID(claims["sub"])
         except (jwt.PyJWTError, ValueError) as exc:
             raise InvalidTokenError from exc
+        return claims
 
     def _encode(
-        self, user_id: UUID, kind: Literal["access", "refresh"], now: datetime, ttl: timedelta
+        self,
+        user_id: UUID,
+        kind: Literal["access", "refresh"],
+        now: datetime,
+        expires_at: datetime,
+        jti: str,
     ) -> str:
-        claims = {"sub": str(user_id), "type": kind, "iat": now, "exp": now + ttl}
-        # jti: identifica cada token (la rotación del refresh llega en PF-25).
-        return jwt.encode({**claims, "jti": uuid4().hex}, self._secret, algorithm=ALGORITHM)
+        claims = {"sub": str(user_id), "type": kind, "iat": now, "exp": expires_at, "jti": jti}
+        return jwt.encode(claims, self._secret, algorithm=ALGORITHM)

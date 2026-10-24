@@ -25,4 +25,8 @@ class LoginUser:
         valid = await self.hasher.verify(password, user.password_hash if user else None)
         if user is None or not valid:
             raise InvalidCredentialsError
-        return self.tokens.issue(user.id)
+        tokens = self.tokens.issue(user.id)
+        async with self.uow:
+            await self.uow.refresh_tokens.add(tokens.refresh)
+            await self.uow.commit()
+        return tokens

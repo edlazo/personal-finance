@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID, uuid4
 
-from app.shared.domain.auth import TokenPair
+from app.shared.domain.auth import RefreshClaims, TokenPair
 from app.shared.domain.errors import ConflictError, UnauthorizedError
 from app.shared.domain.rates import RateType
 
@@ -56,4 +56,12 @@ class PasswordHasher(Protocol):
 class TokenService(Protocol):
     def issue(self, user_id: UUID) -> TokenPair: ...
 
-    def decode_access(self, token: str) -> UUID: ...
+    def decode_refresh(self, token: str) -> RefreshClaims: ...
+
+
+class RefreshTokenRepository(Protocol):
+    async def add(self, token: RefreshClaims) -> None: ...
+
+    async def revoke(self, jti: str) -> bool:
+        """Revoca el token si estaba activo; False si no existe o ya estaba revocado."""
+        ...
