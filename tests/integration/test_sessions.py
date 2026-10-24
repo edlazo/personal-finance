@@ -24,28 +24,32 @@ def client(migrated_database_url: str) -> Iterator[TestClient]:
 
 @pytest.fixture
 def refresh_token(client: TestClient) -> str:
+    """Inicia sesión: el refresh queda en la cookie del cliente y también se devuelve."""
     email = f"sesion-{uuid4().hex[:8]}@example.com"
     client.post("/auth/register", json={"email": email, "password": PASSWORD, "name": "Ana"})
-    login = client.post("/auth/login", json={"email": email, "password": PASSWORD})
-    return str(login.json()["refresh_token"])
+    client.post("/auth/login", json={"email": email, "password": PASSWORD})
+    return str(client.cookies["refresh_token"])
 
 
 def test_refresh_rotates_and_the_old_token_stops_working(
     client: TestClient, refresh_token: str
 ) -> None:
-    rotated = client.post("/auth/refresh", json={"refresh_token": refresh_token})
-    reused = client.post("/auth/refresh", json={"refresh_token": refresh_token})
+    rotated = client.post("/auth/refresh")
+    client.cookies.set("refresh_token", refresh_token)
+    reused = client.post("/auth/refresh")
 
     assert rotated.status_code == 200
-    assert rotated.json()["refresh_token"] != refresh_token
+    assert rotated.cookies["refresh_token"] != refresh_token
     assert reused.status_code == 401
     assert reused.headers["www-authenticate"] == "Bearer"
 
 
 def test_logout_revokes_the_refresh_token(client: TestClient, refresh_token: str) -> None:
-    first = client.post("/auth/logout", json={"refresh_token": refresh_token})
-    again = client.post("/auth/logout", json={"refresh_token": refresh_token})
-    after = client.post("/auth/refresh", json={"refresh_token": refresh_token})
+    first = client.post("/auth/logout")
+    client.cookies.set("refresh_token", refresh_token)
+    again = client.post("/auth/logout")
+    client.cookies.set("refresh_token", refresh_token)
+    after = client.post("/auth/refresh")
 
     assert first.status_code == 204
     assert again.status_code == 204
