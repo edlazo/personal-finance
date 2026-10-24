@@ -1,6 +1,6 @@
 """Endpoints de cuentas."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.ledger.application.create_account import CreateAccount
 from app.modules.ledger.application.manage_accounts import (
+    AccountBalance,
     ArchiveAccount,
+    GetAccount,
     ListAccounts,
     UpdateAccount,
 )
@@ -47,6 +49,19 @@ class AccountResponse(BaseModel):
     initial_balance: Decimal
     created_at: datetime
     archived_at: datetime | None
+
+
+class AccountBalanceResponse(AccountResponse):
+    # Saldo inicial más movimientos, en la moneda de la cuenta (string decimal en JSON).
+    balance: Decimal
+
+
+def balance_response(item: AccountBalance) -> AccountBalanceResponse:
+    account = AccountResponse.model_validate(item.account).model_dump()
+    return AccountBalanceResponse(**account, balance=item.balance)
+
+
+AsOf = Annotated[date | None, Query(description="Saldo a esa fecha (inclusive)")]
 
 
 def get_accounts_uow(
@@ -90,13 +105,21 @@ async def create_account(
     return AccountResponse.model_validate(account)
 
 
-@router.get("", summary="Listar mis cuentas")
+@router.get("", summary="Listar mis cuentas con su saldo")
 async def list_accounts(
     uow: AccountsUow,
     include_archived: Annotated[bool, Query(description="Incluir las archivadas")] = False,
-) -> list[AccountResponse]:
-    accounts = await ListAccounts(uow=uow)(include_archived=include_archived)
-    return [AccountResponse.model_validate(account) for account in accounts]
+    as_of: AsOf = None,
+) -> list[AccountBalanceResponse]:
+    accounts = await ListAccounts(uow=uow)(include_archived=include_archived, as_of=as_of)
+    return [balance_response(item) for item in accounts]
+
+
+@router.get("/{account_id}", summary="Ver una cuenta con su saldo")
+async def get_account(
+    account_id: UUID, uow: AccountsUow, as_of: AsOf = None
+) -> AccountBalanceResponse:
+    return balance_response(await GetAccount(uow=uow)(account_id, as_of=as_of))
 
 
 @router.patch(

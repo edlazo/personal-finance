@@ -1,7 +1,7 @@
 """Cuenta y sus reglas."""
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
@@ -103,3 +103,9 @@ class AccountRepository(Protocol):
     async def save(self, account: Account) -> None: ...
 
     async def has_movements(self, account_id: UUID) -> bool: ...
+
+    async def movement_totals(
+        self, account_ids: list[UUID], *, as_of: date | None
+    ) -> dict[UUID, Decimal]:
+        """Ingresos menos gastos por cuenta, hasta `as_of` inclusive (sin movimientos: no está)."""
+        ...

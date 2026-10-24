@@ -94,3 +94,26 @@ def test_another_users_account_is_404_and_a_token_is_required(
 
     assert response.status_code == 404
     assert expense(client, {}, account_id, str(uuid4())).status_code == 401
+
+
+def test_balance_is_derived_from_movements_and_supports_as_of(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    account = client.post(
+        "/accounts",
+        headers=auth,
+        json={"name": "Caja", "type": "CASH", "currency": "ARS", "initial_balance": "1000.00"},
+    ).json()
+    categories = {
+        f"{c['kind']}:{c['name']}": c["id"] for c in client.get("/categories", headers=auth).json()
+    }
+    sueldo = {"kind": "INCOME", "amount": "500.00", "date": "2026-10-01"}
+    expense(client, auth, account["id"], categories["INCOME:Sueldo"], **sueldo)
+    expense(client, auth, account["id"], categories["EXPENSE:Ocio"], amount="200.50")
+
+    today = client.get(f"/accounts/{account['id']}", headers=auth).json()
+    before = client.get("/accounts", headers=auth, params={"as_of": "2026-10-10"}).json()
+
+    assert today["balance"] == "1299.50"
+    assert [a["balance"] for a in before if a["id"] == account["id"]] == ["1500.00"]
