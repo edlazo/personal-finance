@@ -28,7 +28,8 @@ async def test_first_use_creates_the_default_categories_once() -> None:
 async def test_a_user_with_categories_does_not_get_the_defaults() -> None:
     uow = FakeLedgerUnitOfWork()
     user_id = uuid4()
-    uow.categories.items.append(Category(user_id, "Mascotas", CategoryKind.EXPENSE))
+    mascotas = Category(user_id, "Mascotas", CategoryKind.EXPENSE)
+    uow.categories.items[mascotas.id] = mascotas
 
     categories = await ListCategories(uow=uow)(user_id)
 
