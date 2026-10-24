@@ -83,4 +83,4 @@ SemVer con tags `vMAJOR.MINOR.PATCH` sobre `main`, al cierre de los sprints que 
 
 Cada push a `main` publica `ghcr.io/edlazo/personal-finance:latest` y `:sha-<corto>`; cada tag `vX.Y.Z` publica `:vX.Y.Z` (workflow `docker.yml`).
 
-Dependabot abre PRs semanales a `develop` (pip y GitHub Actions) con título `build(deps): ...`.
+Dependabot abre PRs semanales a `develop` (pip, npm y GitHub Actions) con título `build(deps): ...`. Si uno queda desactualizado o en conflicto, no uses "Update branch" ni el editor de conflictos de GitHub: comentá `@dependabot rebase` (o `@dependabot recreate` si alguien tocó la rama).

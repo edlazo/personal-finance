@@ -23,7 +23,7 @@
 | **PF-E9** Planificación | Movimientos recurrentes y presupuestos mensuales por categoría. | 4 | 12 |
 | **PF-E10** Reportes | Patrimonio neto, flujo de fondos, gastos por categoría y evolución histórica. | 5 | 17 |
 | **PF-E11** Bienes (futuro) | Inmuebles y vehículos con valuación manual incluidos en el patrimonio. | 2 | 8 |
-| **PF-E12** Frontend | SPA React + Vite + TS en `frontend/`: dashboard con datos mock tipados (agregada en la Review del Sprint 1). | 4 | 16 |
+| **PF-E12** Frontend | SPA React + Vite + TS en `frontend/`: dashboard con datos mock tipados (agregada en la Review del Sprint 1). | 5 | 19 |
 
 ## PF-E0 - Setup & DevOps
 
@@ -128,7 +128,7 @@ _Registro, login JWT, refresh, perfil y preferencias. Aislamiento multiusuario._
 - [ ] Dado un email no registrado y contraseña válida (>= 10 caracteres), cuando hago `POST /auth/register`, entonces se crea el usuario y responde 201 sin exponer el hash
 - [ ] Dado un email ya registrado, entonces responde 409
 - [ ] La contraseña se guarda con Argon2id (pwdlib)
-- [ ] Al registrarse se crean las categorías por defecto (ver US-014) y preferencia de cotización MEP
+- [ ] Al registrarse se crea la preferencia de cotización MEP (las categorías por defecto pasan a US-014; Planning del Sprint 3)
 
 ### US-007 - Login con JWT
 `Story` | **3 SP** | Prioridad **Highest** | Sprint 2 | label `identity`
@@ -215,6 +215,7 @@ _Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD)._
 
 **Criterios de aceptación**
 - [ ] Al registrarse se crean categorías de gasto (Supermercado, Servicios, Alquiler, Transporte, Salud, Ocio, Educación, Impuestos, Otros) e ingreso (Sueldo, Freelance, Rentas, Otros)
+- [ ] Los usuarios registrados antes de esta historia también reciben las categorías por defecto (migración de datos)
 - [ ] Las categorías por defecto se pueden renombrar o archivar
 
 ### US-015 - Gestionar categorías y subcategorias
@@ -645,3 +646,11 @@ _Agregada el 2026-10-23 (Review del Sprint 1) a pedido del PO. Diseño de refere
 
 - [ ] Perfil, tarjeta de crédito (disponible y próximo resumen), últimos 5 movimientos, seguridad (2FA y sesiones), gastos por categoría e inversiones (valor y P&L)
 - [ ] Datos mock tipados
+
+### US-061 - Login y registro en el frontend
+`Story` | **3 SP** | Prioridad **High** | label `frontend` | Jira PF-82 | Agregada en el Planning del Sprint 3
+
+- [ ] Pantallas de login y registro con validación y mensajes de error de la API (problem+json)
+- [ ] Tokens guardados de forma segura y renovados con el refresh; Salir hace logout
+- [ ] Sin sesión, el dashboard redirige al login
+- [ ] El header y el perfil usan `GET /me` en lugar del usuario de ejemplo
