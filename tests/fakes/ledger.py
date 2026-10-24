@@ -5,7 +5,9 @@ from typing import Self
 from uuid import UUID
 
 from app.modules.ledger.domain.category import Category
+from app.modules.ledger.domain.transaction import Transaction
 from app.shared.domain.errors import NotFoundError
+from fakes.accounts import InMemoryAccounts
 
 
 class InMemoryCategories:
@@ -50,9 +52,19 @@ class InMemoryCategories:
                 child.archive()
 
 
+class InMemoryTransactions:
+    def __init__(self) -> None:
+        self.items: list[Transaction] = []
+
+    async def add(self, transaction: Transaction) -> None:
+        self.items.append(transaction)
+
+
 class FakeLedgerUnitOfWork:
     def __init__(self) -> None:
+        self.accounts = InMemoryAccounts()
         self.categories = InMemoryCategories()
+        self.transactions = InMemoryTransactions()
         self.commits = 0
 
     async def __aenter__(self) -> Self:
