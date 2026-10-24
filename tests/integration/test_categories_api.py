@@ -75,3 +75,49 @@ async def test_simultaneous_first_uses_do_not_duplicate(
 
 def test_categories_require_a_token(client: TestClient) -> None:
     assert client.get("/categories").status_code == 401
+
+
+def test_subcategories_rename_move_and_archive(
+    client: TestClient, sign_up: Callable[[], tuple[UUID, dict[str, str]]]
+) -> None:
+    _, auth = sign_up()
+    comida = client.post("/categories", headers=auth, json={"name": "Comida", "kind": "EXPENSE"})
+    parent_id = comida.json()["id"]
+    delivery = client.post(
+        "/categories",
+        headers=auth,
+        json={"name": "Delivery", "kind": "EXPENSE", "parent_id": parent_id},
+    )
+    url = f"/categories/{delivery.json()['id']}"
+
+    repeated = client.post(
+        "/categories",
+        headers=auth,
+        json={"name": "delivery", "kind": "EXPENSE", "parent_id": parent_id},
+    )
+    renamed = client.patch(url, headers=auth, json={"name": "Envíos"})
+    top_level = client.patch(url, headers=auth, json={"parent_id": None})
+    moved_back = client.patch(url, headers=auth, json={"parent_id": parent_id})
+    archived = client.delete(f"/categories/{parent_id}", headers=auth)
+    active = {c["name"] for c in client.get("/categories", headers=auth).json()}
+    read_only = client.patch(url, headers=auth, json={"name": "Otra"})
+
+    assert (comida.status_code, delivery.status_code, repeated.status_code) == (201, 201, 409)
+    assert renamed.json()["name"] == "Envíos"
+    assert top_level.json()["parent_id"] is None
+    assert moved_back.json()["parent_id"] == parent_id
+    assert archived.status_code == 204
+    assert not {"Comida", "Envíos"} & active
+    assert read_only.status_code == 409
+
+
+def test_a_user_gets_404_on_another_users_categories(
+    client: TestClient, sign_up: Callable[[], tuple[UUID, dict[str, str]]]
+) -> None:
+    _, ana = sign_up()
+    _, beto = sign_up()
+    category_id = client.get("/categories", headers=ana).json()[0]["id"]
+
+    assert client.delete(f"/categories/{category_id}", headers=beto).status_code == 404
+    child = {"name": "Mía", "kind": "EXPENSE", "parent_id": category_id}
+    assert client.post("/categories", headers=beto, json=child).status_code == 404
