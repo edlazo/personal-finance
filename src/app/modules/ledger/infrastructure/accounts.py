@@ -118,7 +118,7 @@ class SqlAlchemyAccountRepository(UserScopedRepository[AccountModel]):
         )
         if as_of is not None:
             query = query.where(TransactionModel.date <= as_of)
-        return dict((await self.session.execute(query)).tuples().all())
+        return dict((await self.session.execute(query)).all())
 
     async def add(self, account: Account) -> None:
         self.session.add(
