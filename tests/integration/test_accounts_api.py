@@ -77,3 +77,49 @@ def test_balance_rules(client: TestClient, sign_up: Callable[[], dict[str, str]]
 
 def test_creating_an_account_requires_a_token(client: TestClient) -> None:
     assert create(client, {}).status_code == 401
+
+
+def test_list_edit_and_archive(client: TestClient, sign_up: Callable[[], dict[str, str]]) -> None:
+    auth = sign_up()
+    account_id = create(client, auth).json()["id"]
+    create(client, auth, name="Efectivo", type="CASH")
+
+    edited = client.patch(f"/accounts/{account_id}", headers=auth, json={"currency": "USD"})
+    archived = client.delete(f"/accounts/{account_id}", headers=auth)
+    again = client.delete(f"/accounts/{account_id}", headers=auth)
+    active = client.get("/accounts", headers=auth).json()
+    everything = client.get("/accounts", headers=auth, params={"include_archived": True}).json()
+    read_only = client.patch(f"/accounts/{account_id}", headers=auth, json={"name": "Otra"})
+
+    assert edited.json()["currency"] == "USD"
+    assert (archived.status_code, again.status_code) == (204, 204)
+    assert [a["name"] for a in active] == ["Efectivo"]
+    assert len(everything) == 2
+    assert read_only.status_code == 409
+
+
+def test_rename_rules(client: TestClient, sign_up: Callable[[], dict[str, str]]) -> None:
+    auth = sign_up()
+    account_id = create(client, auth, name="galicia").json()["id"]
+    create(client, auth, name="Santander")
+
+    own_case = client.patch(f"/accounts/{account_id}", headers=auth, json={"name": "Galicia"})
+    taken = client.patch(f"/accounts/{account_id}", headers=auth, json={"name": "SANTANDER"})
+
+    assert own_case.status_code == 200
+    assert taken.status_code == 409
+
+
+def test_a_user_gets_404_on_another_users_accounts(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    ana, beto = sign_up(), sign_up()
+    account_id = create(client, ana).json()["id"]
+
+    assert client.get("/accounts", headers=beto).json() == []
+    assert (
+        client.patch(f"/accounts/{account_id}", headers=beto, json={"name": "Mía"}).status_code
+        == 404
+    )
+    assert client.delete(f"/accounts/{account_id}", headers=beto).status_code == 404
+    assert client.get("/accounts", headers=ana).json()[0]["archived_at"] is None
