@@ -15,16 +15,17 @@ from app.modules.ledger.domain.category import CategoryKind
 from app.modules.ledger.domain.transaction import TransactionFilter
 from app.shared.api.auth import CurrentUserId
 
+Description = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None
+Amount = Annotated[Decimal, Field(gt=0, max_digits=20, decimal_places=2)]
+
 
 class CreateTransactionRequest(BaseModel):
     account_id: UUID
     kind: CategoryKind
-    amount: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
+    amount: Amount
     date: dt.date
     category_id: UUID
-    description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = (
-        None
-    )
+    description: Description = None
 
 
 class TransactionResponse(BaseModel):
@@ -36,8 +37,10 @@ class TransactionResponse(BaseModel):
     # En JSON va como string decimal ("1500.50"), nunca como float.
     amount: Decimal
     date: dt.date
-    category_id: UUID
+    category_id: UUID | None
     description: str | None
+    # Solo en las dos patas de una transferencia (POST /transfers).
+    transfer_group_id: UUID | None
 
 
 class TransactionQuery(BaseModel):
