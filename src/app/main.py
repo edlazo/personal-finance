@@ -9,6 +9,7 @@ from app.config import Settings, get_settings
 from app.modules.accounts.api.routes import router as accounts_router
 from app.modules.identity.api.routes import me_router
 from app.modules.identity.api.routes import router as auth_router
+from app.modules.ledger.api.routes import router as categories_router
 from app.shared.api.health import router as health_router
 from app.shared.api.middleware import request_logging
 from app.shared.api.problems import register_problem_handlers
@@ -39,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(me_router)
     app.include_router(accounts_router)
+    app.include_router(categories_router)
     return app
 
 
