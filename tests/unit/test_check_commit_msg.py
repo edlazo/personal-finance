@@ -52,3 +52,12 @@ def test_main_exit_codes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> 
     assert main(["--file", str(message)]) == 1
     assert "Prefijo inválido" in capsys.readouterr().err
     assert main(["docs: actualizar README", "ci: agregar workflow"]) == 0
+
+
+def test_max_length_counts_characters_not_bytes() -> None:
+    # 72 caracteres con tildes: son más de 72 bytes, pero entran.
+    subject = "feat(frontend): perfil, tarjeta y últimos movimientos más largos [PF-79]"
+    assert len(subject) == 72
+    assert check(subject, max_length=72) is None
+    assert check(subject + "x", max_length=72) is not None
+    assert main(["--max-length", "72", subject + "x"]) == 1
