@@ -5,7 +5,7 @@ from typing import Self
 from uuid import UUID
 
 from app.modules.ledger.domain.category import Category
-from app.modules.ledger.domain.transaction import Transaction
+from app.modules.ledger.domain.transaction import Transaction, TransactionFilter
 from app.shared.domain.errors import NotFoundError
 from fakes.accounts import InMemoryAccounts
 
@@ -58,6 +58,18 @@ class InMemoryTransactions:
 
     async def add(self, transaction: Transaction) -> None:
         self.items.append(transaction)
+
+    async def search(
+        self, filters: TransactionFilter, *, limit: int, offset: int
+    ) -> tuple[list[Transaction], int]:
+        # shortcut: solo filtra por categorías; el resto de los filtros se prueba contra Postgres.
+        found = [
+            t
+            for t in self.items
+            if filters.category_ids is None or t.category_id in filters.category_ids
+        ]
+        found.sort(key=lambda t: (t.date, t.created_at), reverse=True)
+        return found[offset : offset + limit], len(found)
 
 
 class FakeLedgerUnitOfWork:

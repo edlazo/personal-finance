@@ -47,5 +47,25 @@ def check_movement(kind: CategoryKind, account: Account, category: Category) -> 
         raise InvalidTransactionError("La categoría no coincide con el tipo del movimiento")
 
 
+@dataclass(frozen=True)
+class TransactionFilter:
+    """Filtros del listado; los que quedan en None no filtran."""
+
+    date_from: date | None = None
+    date_to: date | None = None
+    account_id: UUID | None = None
+    category_ids: frozenset[UUID] | None = None
+    kind: CategoryKind | None = None
+    text: str | None = None
+    amount_min: Decimal | None = None
+    amount_max: Decimal | None = None
+
+
 class TransactionRepository(Protocol):
     async def add(self, transaction: Transaction) -> None: ...
+
+    async def search(
+        self, filters: TransactionFilter, *, limit: int, offset: int
+    ) -> tuple[list[Transaction], int]:
+        """Página ordenada por fecha descendente y el total de coincidencias."""
+        ...
