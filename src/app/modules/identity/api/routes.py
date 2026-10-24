@@ -1,0 +1,59 @@
+"""Endpoints de autenticación."""
+
+from datetime import datetime
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.modules.identity.application.register_user import RegisterUser
+from app.modules.identity.domain.user import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
+from app.modules.identity.infrastructure.persistence import (
+    Argon2PasswordHasher,
+    SqlAlchemyIdentityUnitOfWork,
+)
+from app.shared.api.dependencies import get_session_factory
+from app.shared.domain.rates import RateType
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    email: str
+    name: str
+    default_rate_type: RateType
+    created_at: datetime
+
+
+def get_register_user(
+    session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
+) -> RegisterUser:
+    return RegisterUser(
+        uow=SqlAlchemyIdentityUnitOfWork(session_factory), hasher=Argon2PasswordHasher()
+    )
+
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar un usuario",
+    description="Crea el usuario con la cotización MEP como preferencia. Nunca devuelve el hash.",
+    responses={status.HTTP_409_CONFLICT: {"description": "El email ya está registrado"}},
+)
+async def register(
+    body: RegisterRequest, register_user: Annotated[RegisterUser, Depends(get_register_user)]
+) -> UserResponse:
+    user = await register_user(email=body.email, password=body.password, name=body.name)
+    return UserResponse.model_validate(user)
