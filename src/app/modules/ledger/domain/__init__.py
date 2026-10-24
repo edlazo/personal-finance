@@ -1,0 +1,1 @@
+"""Categorías y movimientos."""
