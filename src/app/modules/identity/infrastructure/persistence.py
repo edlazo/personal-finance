@@ -4,6 +4,7 @@ import asyncio
 import secrets
 from functools import cache
 from typing import Self
+from uuid import UUID
 
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
@@ -35,6 +36,17 @@ class SqlAlchemyUserRepository:
     async def get_by_email(self, email: str) -> User | None:
         model = await self._session.scalar(select(UserModel).where(UserModel.email == email))
         return None if model is None else _to_domain(model)
+
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        model = await self._session.get(UserModel, user_id)
+        return None if model is None else _to_domain(model)
+
+    async def save_preferences(self, user: User) -> None:
+        await self._session.execute(
+            update(UserModel)
+            .where(UserModel.id == user.id)
+            .values(default_rate_type=user.default_rate_type)
+        )
 
     async def add(self, user: User) -> None:
         self._session.add(

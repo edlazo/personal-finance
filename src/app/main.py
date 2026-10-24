@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import Settings, get_settings
+from app.modules.identity.api.routes import me_router
 from app.modules.identity.api.routes import router as auth_router
 from app.shared.api.health import router as health_router
 from app.shared.api.middleware import request_logging
@@ -35,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     register_problem_handlers(app)
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(me_router)
     return app
 
 

@@ -16,7 +16,13 @@ class InMemoryUsers:
     async def get_by_email(self, email: str) -> User | None:
         return self.by_email.get(email)
 
+    async def get_by_id(self, user_id: UUID) -> User | None:
+        return next((u for u in self.by_email.values() if u.id == user_id), None)
+
     async def add(self, user: User) -> None:
+        self.by_email[user.email] = user
+
+    async def save_preferences(self, user: User) -> None:
         self.by_email[user.email] = user
 
 
