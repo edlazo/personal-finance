@@ -1,10 +1,10 @@
 import { render, screen, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
 
-import App from './App'
+import { DashboardLayout } from './DashboardLayout'
 
 test('la sidebar tiene todas las secciones y marca el dashboard como actual', () => {
-  render(<App />)
+  render(<DashboardLayout />)
   const nav = within(screen.getByRole('navigation', { name: 'Principal' }))
 
   for (const name of ['Cuentas', 'Movimientos', 'Inversiones', 'Tarjetas', 'Reportes']) {
@@ -16,7 +16,7 @@ test('la sidebar tiene todas las secciones y marca el dashboard como actual', ()
 })
 
 test('el header saluda al usuario y tiene búsqueda, notificaciones y avatar', () => {
-  render(<App />)
+  render(<DashboardLayout />)
 
   expect(screen.getByRole('heading', { name: 'Hola, Elias' })).toBeInTheDocument()
   expect(screen.getByRole('searchbox', { name: 'Buscar' })).toBeInTheDocument()
@@ -25,7 +25,7 @@ test('el header saluda al usuario y tiene búsqueda, notificaciones y avatar', (
 })
 
 test('hay un atajo al contenido y el dashboard ya no tiene módulos pendientes', () => {
-  render(<App />)
+  render(<DashboardLayout />)
 
   expect(screen.getByRole('link', { name: 'Ir al contenido' })).toHaveAttribute(
     'href',
