@@ -8,7 +8,7 @@
 | **Developer** | Claude (con revisión del PO) | Diseña, implementa, testea y documenta los incrementos según la DoD. |
 
 ## Cadencia
-- **Sprint:** 2 semanas.
+- **Sprint:** 2 semanas, planificado por objetivo: se compromete según la velocity y, si el Sprint Goal se cumple antes, se hacen la Review y la Retro y se planifica el siguiente (decisión del PO en el cierre del Sprint 4).
 - **Dedicación:** unas 10 h/semana, o sea unas 20 h por sprint.
 - **Ceremonias:** unas 3 h por sprint, así que quedan **unas 17 h netas de desarrollo**.
 
