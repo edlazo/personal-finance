@@ -18,7 +18,7 @@ select = [
 [tool.mypy]
 python_version = "3.14"
 strict = true
-mypy_path = "src,scripts"
+mypy_path = "src,scripts,tests"
 explicit_package_bases = true
 files = ["src", "tests", "migrations", "scripts"]
 plugins = ["pydantic.mypy"]
@@ -36,7 +36,7 @@ warn_required_dynamic_aliases = true
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
-pythonpath = ["src", "scripts"]
+pythonpath = ["src", "scripts", "tests"]
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 # FastAPI y Starlette emiten sus deprecaciones como UserWarning, por eso se listan aparte.
 filterwarnings = [

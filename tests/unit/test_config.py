@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from app.config import Settings, get_settings
 
@@ -19,7 +19,10 @@ def test_defaults_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_reads_dotenv_file(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
-    env_file.write_text("ENVIRONMENT=production\nDEBUG=true\n", encoding="utf-8")
+    env_file.write_text(
+        "ENVIRONMENT=production\nDEBUG=true\nJWT_SECRET=una-clave-de-produccion-de-32-caracteres\n",
+        encoding="utf-8",
+    )
 
     settings = Settings(_env_file=env_file)
 
@@ -48,3 +51,16 @@ def test_env_example_is_valid() -> None:
 
 def test_get_settings_is_cached() -> None:
     assert get_settings() is get_settings()
+
+
+def test_production_requires_a_real_jwt_secret() -> None:
+    with pytest.raises(ValidationError, match="JWT_SECRET"):
+        Settings(_env_file=None, environment="production")
+
+    real = SecretStr("una-clave-de-produccion-de-32-caracteres-o-mas")
+    assert Settings(_env_file=None, environment="production", jwt_secret=real).jwt_secret == real
+
+
+def test_jwt_secret_needs_32_characters() -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, jwt_secret=SecretStr("corta"))

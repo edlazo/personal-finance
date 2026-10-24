@@ -1,6 +1,8 @@
 """Repositorio, Unit of Work y hashing de identity."""
 
 import asyncio
+import secrets
+from functools import cache
 from typing import Self
 
 from pwdlib import PasswordHash
@@ -60,10 +62,23 @@ class SqlAlchemyIdentityUnitOfWork(SqlAlchemyUnitOfWork):
         return self
 
 
-class Argon2PasswordHasher:
-    def __init__(self) -> None:
-        self._hasher = PasswordHash((Argon2Hasher(),))
+_hasher = PasswordHash((Argon2Hasher(),))
 
+
+@cache
+def _dummy_hash() -> str:
+    # Se calcula una vez por proceso; sirve para verificar cuando el usuario no existe.
+    return _hasher.hash(secrets.token_urlsafe(16))
+
+
+class Argon2PasswordHasher:
+    # Argon2 usa CPU a propósito: en un thread para no bloquear el event loop.
     async def hash(self, password: str) -> str:
-        # Argon2 usa CPU a propósito: en un thread para no bloquear el event loop.
-        return await asyncio.to_thread(self._hasher.hash, password)
+        return await asyncio.to_thread(_hasher.hash, password)
+
+    async def verify(self, password: str, password_hash: str | None) -> bool:
+        target = (
+            password_hash if password_hash is not None else await asyncio.to_thread(_dummy_hash)
+        )
+        valid = await asyncio.to_thread(_hasher.verify, password, target)
+        return valid and password_hash is not None

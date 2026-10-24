@@ -11,11 +11,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
-from app.shared.domain.errors import ConflictError, DomainError, NotFoundError
+from app.shared.domain.errors import ConflictError, DomainError, NotFoundError, UnauthorizedError
 
 logger = structlog.get_logger()
 
-STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {NotFoundError: 404, ConflictError: 409}
+STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
+    UnauthorizedError: 401,
+    NotFoundError: 404,
+    ConflictError: 409,
+}
 
 
 def problem(
@@ -38,7 +42,9 @@ async def domain_error(request: Request, exc: DomainError) -> JSONResponse:
     status = next(
         (code for cls, code in STATUS_BY_DOMAIN_ERROR.items() if isinstance(exc, cls)), 422
     )
-    return problem(status, str(exc))
+    # RFC 6750: un 401 indica cómo autenticarse.
+    headers = {"WWW-Authenticate": "Bearer"} if status == 401 else None
+    return problem(status, str(exc), headers=headers)
 
 
 async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
