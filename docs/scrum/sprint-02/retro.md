@@ -17,7 +17,7 @@
 - Medir el diff antes de commitear (acción A1 del Sprint 1): PF-76 y PF-79 se dividieron a tiempo y ningún PR superó las 400 líneas.
 - Verificar versiones antes de usar algo: se detectaron los cambios de la plantilla de Vite (oxlint, TypeScript 6), se verificó el paquete nuevo `cn` de shadcn y Recharts se subió a la última versión.
 - El job `quality / frontend` funcionó desde su primer run, y la regla de un commit frenó dos PRs de Dependabot actualizados con merge commits.
-- _(PO) a completar._
+- _(PO) sin aportes (confirmado en el cierre del Sprint 3)._
 
 ## Qué no salió bien (mejorar)
 1. **(SM/Dev)** Dos asuntos de commit pasaron los 72 caracteres (PF-77 y PF-79) aunque se medían: se imprimía el largo pero no se frenaba el commit, y Git Bash contaba bytes. El PR #15 falló por lo mismo.
@@ -26,7 +26,7 @@
 4. No se pudo verificar la navegación por teclado en el navegador integrado, y los tests de integración de PF-22 no corrieron en local (Docker apagado); se confió en el CI.
 5. El Sprint 2 se ejecutó antes de sus fechas planificadas: Jira y el acta del Planning no coinciden con lo que pasó.
 6. Siguen abiertas las acciones A3 y A4 del Sprint 1, y faltan los aportes del PO en su Retro.
-7. _(PO) a completar._
+7. _(PO) sin aportes (confirmado en el cierre del Sprint 3)._
 
 ## Acciones
 | # | Acción | Responsable | Para cuándo |
