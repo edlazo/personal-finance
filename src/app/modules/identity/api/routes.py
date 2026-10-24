@@ -4,10 +4,11 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.config import Settings
 from app.modules.identity.application.login_user import LoginUser
 from app.modules.identity.application.profile import GetProfile, UpdatePreferences
 from app.modules.identity.application.register_user import RegisterUser
@@ -19,7 +20,7 @@ from app.modules.identity.infrastructure.persistence import (
 )
 from app.shared.api.auth import CurrentUserId, get_token_service
 from app.shared.api.dependencies import get_session_factory
-from app.shared.domain.auth import TokenPair
+from app.shared.domain.auth import InvalidTokenError, TokenPair
 from app.shared.domain.rates import RateType
 from app.shared.infrastructure.tokens import JwtTokenService
 
@@ -36,23 +37,38 @@ class LoginRequest(BaseModel):
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
 
 
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
 class TokenResponse(BaseModel):
+    """El refresh token no viaja en el cuerpo: va en una cookie httpOnly (decisión del PO)."""
+
     access_token: str
-    refresh_token: str
     token_type: Literal["bearer"] = "bearer"  # noqa: S105 - tipo estándar de OAuth2, no un secreto
     expires_in: int
 
 
-def token_response(tokens: TokenPair) -> TokenResponse:
-    return TokenResponse(
-        access_token=tokens.access_token,
-        refresh_token=tokens.refresh_token,
-        expires_in=tokens.expires_in,
+REFRESH_COOKIE = "refresh_token"
+
+
+def _secure(request: Request) -> bool:
+    settings: Settings = request.app.state.settings
+    # Secure solo en producción: en desarrollo y en los tests no hay HTTPS.
+    return settings.environment == "production"
+
+
+def token_response(request: Request, response: Response, tokens: TokenPair) -> TokenResponse:
+    settings: Settings = request.app.state.settings
+    # httpOnly: JavaScript no la lee (XSS). SameSite=Strict: otro sitio no la manda (CSRF).
+    response.set_cookie(
+        REFRESH_COOKIE,
+        tokens.refresh_token,
+        max_age=settings.refresh_token_days * 24 * 3600,
+        httponly=True,
+        samesite="strict",
+        secure=_secure(request),
     )
+    return TokenResponse(access_token=tokens.access_token, expires_in=tokens.expires_in)
+
+
+RefreshCookie = Annotated[str | None, Cookie(alias=REFRESH_COOKIE)]
 
 
 class UserResponse(BaseModel):
@@ -114,33 +130,56 @@ async def register(
 @router.post(
     "/login",
     summary="Iniciar sesión",
-    description="Devuelve un access token (15 min) y un refresh token (7 días).",
+    description="Devuelve el access token (15 min); el refresh (7 días) va en una cookie httpOnly.",
     responses={status.HTTP_401_UNAUTHORIZED: {"description": "Email o contraseña incorrectos"}},
 )
 async def login(
-    body: LoginRequest, login_user: Annotated[LoginUser, Depends(get_login_user)]
+    body: LoginRequest,
+    request: Request,
+    response: Response,
+    login_user: Annotated[LoginUser, Depends(get_login_user)],
 ) -> TokenResponse:
-    return token_response(await login_user(email=body.email, password=body.password))
+    tokens = await login_user(email=body.email, password=body.password)
+    return token_response(request, response, tokens)
 
 
 @router.post(
     "/refresh",
     summary="Renovar la sesión",
-    description="Emite tokens nuevos y revoca el refresh token usado (rotación).",
+    description="Usa la cookie del refresh, la revoca y emite tokens nuevos (rotación).",
     responses={status.HTTP_401_UNAUTHORIZED: {"description": "Refresh token inválido o usado"}},
 )
-async def refresh(body: RefreshRequest, uow: IdentityUow, tokens: Tokens) -> TokenResponse:
-    return token_response(await RefreshSession(uow=uow, tokens=tokens)(body.refresh_token))
+async def refresh(
+    request: Request,
+    response: Response,
+    uow: IdentityUow,
+    tokens: Tokens,
+    refresh_token: RefreshCookie = None,
+) -> TokenResponse:
+    if refresh_token is None:
+        raise InvalidTokenError
+    new_tokens = await RefreshSession(uow=uow, tokens=tokens)(refresh_token)
+    return token_response(request, response, new_tokens)
 
 
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Cerrar la sesión",
-    description="Revoca el refresh token. Cerrar una sesión ya cerrada no es un error.",
+    description="Revoca el refresh y borra su cookie. Cerrar una sesión ya cerrada no es un error.",
 )
-async def logout(body: RefreshRequest, uow: IdentityUow, tokens: Tokens) -> None:
-    await Logout(uow=uow, tokens=tokens)(body.refresh_token)
+async def logout(
+    request: Request,
+    response: Response,
+    uow: IdentityUow,
+    tokens: Tokens,
+    refresh_token: RefreshCookie = None,
+) -> None:
+    if refresh_token is not None:
+        await Logout(uow=uow, tokens=tokens)(refresh_token)
+    response.delete_cookie(
+        REFRESH_COOKIE, httponly=True, samesite="strict", secure=_secure(request)
+    )
 
 
 class Preferences(BaseModel):

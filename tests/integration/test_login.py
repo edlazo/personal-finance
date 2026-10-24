@@ -37,7 +37,7 @@ def registered(client: TestClient) -> dict[str, str]:
     return {"id": response.json()["id"], "email": email}
 
 
-def test_login_returns_access_and_refresh_tokens(
+def test_login_returns_the_access_token_and_sets_the_refresh_cookie(
     client: TestClient, settings: Settings, registered: dict[str, str]
 ) -> None:
     response = client.post(
@@ -48,6 +48,8 @@ def test_login_returns_access_and_refresh_tokens(
     body = response.json()
     assert body["token_type"] == "bearer"
     assert body["expires_in"] == 900
+    assert "refresh_token" not in body
+    assert client.cookies["refresh_token"]
     secret = settings.jwt_secret.get_secret_value()
     claims = jwt.decode(body["access_token"], secret, algorithms=["HS256"])
     assert claims["sub"] == registered["id"]
