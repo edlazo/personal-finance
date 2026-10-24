@@ -1,9 +1,9 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { initials } from '@/lib/utils'
-import type { User } from '@/mocks/user'
+import type { Profile } from '@/lib/auth-context'
 
-export function ProfileCard({ user }: { user: User }) {
+export function ProfileCard({ user }: { user: Profile }) {
   return (
     <Card className="rounded-3xl">
       <CardHeader>

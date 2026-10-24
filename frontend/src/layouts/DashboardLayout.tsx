@@ -1,9 +1,13 @@
 import { AppHeader } from '@/components/layout/AppHeader'
 import { AppSidebar } from '@/components/layout/AppSidebar'
-import { mockUser } from '@/mocks/user'
+import { useAuth } from '@/lib/auth-context'
 import { Dashboard } from '@/pages/Dashboard'
 
 export function DashboardLayout() {
+  const { user } = useAuth()
+  // RequireAuth solo renderiza el layout con sesión; esto solo satisface al tipo.
+  if (!user) return null
+
   return (
     <div className="flex min-h-svh flex-col gap-4 p-4 md:flex-row">
       <a
@@ -14,9 +18,9 @@ export function DashboardLayout() {
       </a>
       <AppSidebar />
       <div className="flex flex-1 flex-col gap-6">
-        <AppHeader user={mockUser} />
+        <AppHeader user={user} />
         <main id="contenido">
-          <Dashboard />
+          <Dashboard user={user} />
         </main>
       </div>
     </div>

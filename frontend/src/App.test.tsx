@@ -50,6 +50,8 @@ test('sin sesión, el dashboard redirige al login y al entrar vuelve al dashboar
   fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
 
   expect(await screen.findByRole('navigation', { name: 'Principal' })).toBeInTheDocument()
+  // El header usa el usuario de GET /me, no uno de ejemplo.
+  expect(screen.getByRole('heading', { name: 'Hola, Ana' })).toBeInTheDocument()
 })
 
 test('el login muestra el error de la API', async () => {

@@ -6,8 +6,15 @@ import { mockDashboard } from '@/mocks/dashboard'
 
 import { Dashboard } from './Dashboard'
 
+const USER = {
+  id: '1',
+  email: 'elias@example.com',
+  name: 'Elias Lazo',
+  preferences: { default_rate_type: 'MEP' },
+}
+
 test('los KPIs muestran el monto en es-AR y la variación con el color según si es bueno o malo', () => {
-  render(<Dashboard />)
+  render(<Dashboard user={USER} />)
 
   expect(screen.getByText(/18\.450\.000,00/)).toBeInTheDocument()
   // Los ingresos subieron: es bueno, va en verde.
@@ -17,7 +24,7 @@ test('los KPIs muestran el monto en es-AR y la variación con el color según si
 })
 
 test('el gráfico cambia de moneda con los botones ARS/USD', () => {
-  render(<Dashboard />)
+  render(<Dashboard user={USER} />)
   const ars = screen.getByRole('button', { name: 'ARS' })
   const usd = screen.getByRole('button', { name: 'USD' })
 
@@ -35,11 +42,11 @@ test('la dona muestra el porcentaje usado y lo pasado de presupuesto', () => {
       limit: mockDashboard.budget.limit,
     },
   }
-  const { unmount } = render(<Dashboard />)
+  const { unmount } = render(<Dashboard user={USER} />)
   expect(screen.getByText('68,9%')).toBeInTheDocument()
   unmount()
 
-  render(<Dashboard summary={over} />)
+  render(<Dashboard summary={over} user={USER} />)
   expect(screen.getByText('108,1%')).toBeInTheDocument()
 })
 
@@ -48,7 +55,7 @@ const ars = (amount: string): Money => ({ amount, currency: 'ARS' })
 const shown = (money: Money, signed = false) => formatMoney(money, signed).replace(/ /g, ' ')
 
 test('el perfil y la tarjeta de crédito muestran los datos del usuario', () => {
-  render(<Dashboard />)
+  render(<Dashboard user={USER} />)
 
   expect(screen.getByText('elias@example.com')).toBeInTheDocument()
   expect(screen.getByRole('img', { name: 'VISA terminada en 4821' })).toBeInTheDocument()
@@ -57,7 +64,7 @@ test('el perfil y la tarjeta de crédito muestran los datos del usuario', () => 
 })
 
 test('los últimos movimientos muestran el signo según el tipo y linkean a Movimientos', () => {
-  render(<Dashboard />)
+  render(<Dashboard user={USER} />)
 
   expect(screen.getByText(shown(ars('2350000'), true))).toHaveClass('text-primary')
   expect(screen.getByText(shown(ars('-84500'), true))).toBeInTheDocument()
@@ -67,14 +74,14 @@ test('los últimos movimientos muestran el signo según el tipo y linkean a Movi
 })
 
 test('seguridad avisa si la verificación en dos pasos está desactivada', () => {
-  render(<Dashboard />)
+  render(<Dashboard user={USER} />)
 
   expect(screen.getByText('Desactivada: te recomendamos activarla')).toBeInTheDocument()
   expect(screen.getByText('2')).toBeInTheDocument()
 })
 
 test('los gastos por categoría van de mayor a menor con su porcentaje', () => {
-  render(<Dashboard />)
+  render(<Dashboard user={USER} />)
   const list = within(screen.getByRole('list', { name: 'Gastos por categoría' }))
   const items = list.getAllByRole('listitem')
 
@@ -84,7 +91,7 @@ test('los gastos por categoría van de mayor a menor con su porcentaje', () => {
 })
 
 test('inversiones muestra el valor de la cartera y el resultado en verde si es positivo', () => {
-  render(<Dashboard />)
+  render(<Dashboard user={USER} />)
   const pnl = screen.getByText(/de resultado/)
 
   expect(pnl).toHaveTextContent(`${shown(ars('800000'), true)} (+14,8%) de resultado`)
