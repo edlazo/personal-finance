@@ -22,7 +22,7 @@ repos:
 
       - id: commit-prefix
         name: "prefijo Conventional Commit"
-        entry: python scripts/check_commit_msg.py --file
+        entry: python scripts/check_commit_msg.py --file --max-length 72
         language: system
         stages: [commit-msg]
 

@@ -78,14 +78,17 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: |
-          key="--require-key"
-          [[ "$AUTHOR" == "dependabot[bot]" ]] && key=""
-          python3 scripts/check_commit_msg.py $key "$TITLE"
+          # Dependabot está exento de la key y del largo: sus títulos los arma GitHub.
+          rules="--require-key --max-length 72"
+          [[ "$AUTHOR" == "dependabot[bot]" ]] && rules=""
+          python3 scripts/check_commit_msg.py $rules "$TITLE"
 
       - name: Commits del PR
         run: |
           mapfile -t subjects < <(git log --no-merges --format=%s "$BASE_SHA..$HEAD_SHA")
-          python3 scripts/check_commit_msg.py "${subjects[@]}"
+          limit="--max-length 72"
+          [[ "$AUTHOR" == "dependabot[bot]" ]] && limit=""
+          python3 scripts/check_commit_msg.py $limit "${subjects[@]}"
 
   quality:
     needs: prefix
