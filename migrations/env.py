@@ -11,7 +11,8 @@ import app.modules.identity.infrastructure.models
 
 # Los modelos ORM de cada módulo se importan acá para que autogenerate los detecte.
 import app.modules.ledger.infrastructure.accounts
-import app.modules.ledger.infrastructure.persistence  # noqa: F401
+import app.modules.ledger.infrastructure.persistence
+import app.modules.ledger.infrastructure.transactions  # noqa: F401
 from app.config import get_settings
 from app.shared.infrastructure.database import Base
 

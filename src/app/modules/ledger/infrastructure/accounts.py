@@ -16,6 +16,7 @@ from app.modules.ledger.domain.account import (
     AccountType,
     same_name,
 )
+from app.modules.ledger.infrastructure.transactions import TransactionModel
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import Base
 from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -92,6 +93,12 @@ class SqlAlchemyAccountRepository(UserScopedRepository[AccountModel]):
         except IntegrityError as exc:
             # Dos renombres simultáneos al mismo nombre: los frena el índice único.
             raise AccountNameTakenError from exc
+
+    async def has_movements(self, account_id: UUID) -> bool:
+        movements = select(TransactionModel).where(
+            TransactionModel.user_id == self.user_id, TransactionModel.account_id == account_id
+        )
+        return await self.session.scalar(select(movements.exists())) or False
 
     async def add(self, account: Account) -> None:
         self.session.add(

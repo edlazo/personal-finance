@@ -34,6 +34,11 @@ class AccountNameTakenError(ConflictError):
         super().__init__("Ya tenés una cuenta activa con ese nombre")
 
 
+class AccountCurrencyLockedError(ConflictError):
+    def __init__(self) -> None:
+        super().__init__("No se puede cambiar la moneda de una cuenta con movimientos")
+
+
 class AccountArchivedError(ConflictError):
     def __init__(self) -> None:
         super().__init__("La cuenta está archivada y no se puede editar")
@@ -96,3 +101,5 @@ class AccountRepository(Protocol):
     async def list_accounts(self, *, include_archived: bool) -> list[Account]: ...
 
     async def save(self, account: Account) -> None: ...
+
+    async def has_movements(self, account_id: UUID) -> bool: ...

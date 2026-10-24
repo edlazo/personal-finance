@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.modules.ledger.domain.category import Category, CategoryKind, CategoryNameTakenError
+from app.modules.ledger.infrastructure.accounts import SqlAlchemyAccountRepository
+from app.modules.ledger.infrastructure.transactions import SqlAlchemyTransactionRepository
 from app.shared.infrastructure.database import Base
 from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 from app.shared.infrastructure.user_scoped import UserOwnedMixin, UserScopedRepository
@@ -140,7 +142,9 @@ class SqlAlchemyCategoryRepository(UserScopedRepository[CategoryModel]):
 
 
 class SqlAlchemyLedgerUnitOfWork(SqlAlchemyUnitOfWork):
+    accounts: SqlAlchemyAccountRepository
     categories: SqlAlchemyCategoryRepository
+    transactions: SqlAlchemyTransactionRepository
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession], user_id: UUID) -> None:
         super().__init__(session_factory)
@@ -148,5 +152,7 @@ class SqlAlchemyLedgerUnitOfWork(SqlAlchemyUnitOfWork):
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
+        self.accounts = SqlAlchemyAccountRepository(self.session, self._user_id)
         self.categories = SqlAlchemyCategoryRepository(self.session, self._user_id)
+        self.transactions = SqlAlchemyTransactionRepository(self.session, self._user_id)
         return self

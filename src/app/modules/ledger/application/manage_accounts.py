@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from app.modules.ledger.application.create_account import AccountsUnitOfWork
-from app.modules.ledger.domain.account import Account, AccountNameTakenError
+from app.modules.ledger.domain.account import (
+    Account,
+    AccountCurrencyLockedError,
+    AccountNameTakenError,
+)
 from app.shared.domain.money import Currency
 
 
@@ -26,6 +30,9 @@ class UpdateAccount:
     ) -> Account:
         async with self.uow:
             account = await self.uow.accounts.get_account(account_id)
+            currency_changes = currency is not None and currency != account.currency
+            if currency_changes and await self.uow.accounts.has_movements(account.id):
+                raise AccountCurrencyLockedError
             account.edit(name=name, currency=currency)
             # Excluye la propia cuenta: cambiar "galicia" por "Galicia" es válido.
             if name is not None and await self.uow.accounts.name_taken(

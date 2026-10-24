@@ -11,6 +11,10 @@ from app.shared.domain.errors import NotFoundError
 class InMemoryAccounts:
     def __init__(self) -> None:
         self.items: dict[UUID, Account] = {}
+        self.with_movements: set[UUID] = set()
+
+    async def has_movements(self, account_id: UUID) -> bool:
+        return account_id in self.with_movements
 
     async def name_taken(self, name: str, *, excluding: UUID | None = None) -> bool:
         return any(
