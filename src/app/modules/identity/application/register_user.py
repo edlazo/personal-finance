@@ -6,6 +6,7 @@ from typing import Protocol
 from app.modules.identity.domain.user import (
     EmailAlreadyRegisteredError,
     PasswordHasher,
+    RefreshTokenRepository,
     User,
     UserRepository,
     normalize_email,
@@ -16,6 +17,9 @@ from app.shared.application.unit_of_work import UnitOfWork
 class IdentityUnitOfWork(UnitOfWork, Protocol):
     @property
     def users(self) -> UserRepository: ...
+
+    @property
+    def refresh_tokens(self) -> RefreshTokenRepository: ...
 
 
 @dataclass(frozen=True)

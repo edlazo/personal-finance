@@ -11,18 +11,25 @@ def hasher() -> FakeHasher:
 
 
 @pytest.fixture
-def login(hasher: FakeHasher) -> LoginUser:
-    uow = FakeUnitOfWork()
+def uow() -> FakeUnitOfWork:
+    return FakeUnitOfWork()
+
+
+@pytest.fixture
+def login(hasher: FakeHasher, uow: FakeUnitOfWork) -> LoginUser:
     user = User(email="ana@example.com", name="Ana", password_hash="hashed:clave-larga-123")
     uow.users.by_email[user.email] = user
     return LoginUser(uow=uow, hasher=hasher, tokens=FakeTokens())
 
 
-async def test_valid_credentials_return_tokens(login: LoginUser) -> None:
+async def test_valid_credentials_return_tokens_and_store_the_refresh(
+    login: LoginUser, uow: FakeUnitOfWork
+) -> None:
     tokens = await login(email=" Ana@Example.com ", password="clave-larga-123")
 
     assert tokens.access_token.startswith("access-")
     assert tokens.expires_in == 900
+    assert tokens.refresh.jti in uow.refresh_tokens.active
 
 
 async def test_wrong_password_and_unknown_email_fail_the_same_way(

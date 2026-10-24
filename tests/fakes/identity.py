@@ -1,11 +1,12 @@
 """Dobles en memoria para los casos de uso de identity."""
 
+from datetime import UTC, datetime, timedelta
 from types import TracebackType
 from typing import Self
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.modules.identity.domain.user import User
-from app.shared.domain.auth import TokenPair
+from app.shared.domain.auth import RefreshClaims, TokenPair
 
 
 class InMemoryUsers:
@@ -19,9 +20,26 @@ class InMemoryUsers:
         self.by_email[user.email] = user
 
 
+class InMemoryRefreshTokens:
+    def __init__(self) -> None:
+        self.active: dict[str, RefreshClaims] = {}
+        self.revoked: set[str] = set()
+
+    async def add(self, token: RefreshClaims) -> None:
+        self.active[token.jti] = token
+
+    async def revoke(self, jti: str) -> bool:
+        if jti not in self.active:
+            return False
+        del self.active[jti]
+        self.revoked.add(jti)
+        return True
+
+
 class FakeUnitOfWork:
     def __init__(self) -> None:
         self.users = InMemoryUsers()
+        self.refresh_tokens = InMemoryRefreshTokens()
         self.committed = False
 
     async def __aenter__(self) -> Self:
@@ -55,8 +73,14 @@ class FakeHasher:
 
 
 class FakeTokens:
-    def issue(self, user_id: UUID) -> TokenPair:
-        return TokenPair(f"access-{user_id}", f"refresh-{user_id}", expires_in=900)
+    """El refresh token es "<user_id>:<jti>", para poder decodificarlo sin firmar nada."""
 
-    def decode_access(self, token: str) -> UUID:
-        return UUID(token.removeprefix("access-"))
+    def issue(self, user_id: UUID) -> TokenPair:
+        refresh = RefreshClaims(user_id, uuid4().hex, datetime.now(UTC) + timedelta(days=7))
+        return TokenPair(
+            f"access-{user_id}", f"{user_id}:{refresh.jti}", expires_in=900, refresh=refresh
+        )
+
+    def decode_refresh(self, token: str) -> RefreshClaims:
+        user_id, jti = token.split(":")
+        return RefreshClaims(UUID(user_id), jti, datetime.now(UTC) + timedelta(days=7))

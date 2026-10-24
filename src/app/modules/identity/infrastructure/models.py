@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, String
+from sqlalchemy import DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.domain.rates import RateType
@@ -22,3 +22,12 @@ class UserModel(Base):
         Enum(RateType, name="rate_type", native_enum=False, create_constraint=True, length=10)
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class RefreshTokenModel(Base):
+    __tablename__ = "refresh_tokens"
+
+    jti: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

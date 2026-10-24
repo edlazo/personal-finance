@@ -46,3 +46,16 @@ def test_refresh_token_is_not_an_access_token() -> None:
 def test_invalid_tokens_are_rejected(token: str) -> None:
     with pytest.raises(InvalidTokenError):
         service().decode_access(token)
+
+
+def test_decode_refresh_returns_what_identity_stores() -> None:
+    tokens = service().issue(uuid4())
+
+    claims = service().decode_refresh(tokens.refresh_token)
+
+    assert claims.jti == tokens.refresh.jti
+    assert claims.user_id == tokens.refresh.user_id
+    # El JWT guarda segundos enteros.
+    assert claims.expires_at == tokens.refresh.expires_at.replace(microsecond=0)
+    with pytest.raises(InvalidTokenError):
+        service().decode_refresh(tokens.access_token)

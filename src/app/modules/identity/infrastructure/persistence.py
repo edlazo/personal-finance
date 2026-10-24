@@ -7,12 +7,13 @@ from typing import Self
 
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.identity.domain.user import EmailAlreadyRegisteredError, User
-from app.modules.identity.infrastructure.models import UserModel
+from app.modules.identity.infrastructure.models import RefreshTokenModel, UserModel
+from app.shared.domain.auth import RefreshClaims
 from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 
@@ -53,12 +54,35 @@ class SqlAlchemyUserRepository:
             raise EmailAlreadyRegisteredError from exc
 
 
+class SqlAlchemyRefreshTokenRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(self, token: RefreshClaims) -> None:
+        self._session.add(
+            RefreshTokenModel(jti=token.jti, user_id=token.user_id, expires_at=token.expires_at)
+        )
+        await self._session.flush()
+
+    async def revoke(self, jti: str) -> bool:
+        # Chequear y revocar en una sola sentencia: con dos pedidos simultáneos, gana uno.
+        revoked = await self._session.scalar(
+            update(RefreshTokenModel)
+            .where(RefreshTokenModel.jti == jti, RefreshTokenModel.revoked_at.is_(None))
+            .values(revoked_at=func.now())
+            .returning(RefreshTokenModel.jti)
+        )
+        return revoked is not None
+
+
 class SqlAlchemyIdentityUnitOfWork(SqlAlchemyUnitOfWork):
     users: SqlAlchemyUserRepository
+    refresh_tokens: SqlAlchemyRefreshTokenRepository
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
         self.users = SqlAlchemyUserRepository(self.session)
+        self.refresh_tokens = SqlAlchemyRefreshTokenRepository(self.session)
         return self
 
 

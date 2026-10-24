@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.identity.application.login_user import LoginUser
 from app.modules.identity.application.register_user import RegisterUser
+from app.modules.identity.application.sessions import Logout, RefreshSession
 from app.modules.identity.domain.user import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from app.modules.identity.infrastructure.persistence import (
     Argon2PasswordHasher,
@@ -17,6 +18,7 @@ from app.modules.identity.infrastructure.persistence import (
 )
 from app.shared.api.auth import get_token_service
 from app.shared.api.dependencies import get_session_factory
+from app.shared.domain.auth import TokenPair
 from app.shared.domain.rates import RateType
 from app.shared.infrastructure.tokens import JwtTokenService
 
@@ -33,11 +35,23 @@ class LoginRequest(BaseModel):
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: Literal["bearer"] = "bearer"  # noqa: S105 - tipo estándar de OAuth2, no un secreto
     expires_in: int
+
+
+def token_response(tokens: TokenPair) -> TokenResponse:
+    return TokenResponse(
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+        expires_in=tokens.expires_in,
+    )
 
 
 class UserResponse(BaseModel):
@@ -69,6 +83,16 @@ def get_login_user(
     )
 
 
+def get_identity_uow(
+    session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
+) -> SqlAlchemyIdentityUnitOfWork:
+    return SqlAlchemyIdentityUnitOfWork(session_factory)
+
+
+IdentityUow = Annotated[SqlAlchemyIdentityUnitOfWork, Depends(get_identity_uow)]
+Tokens = Annotated[JwtTokenService, Depends(get_token_service)]
+
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -95,9 +119,24 @@ async def register(
 async def login(
     body: LoginRequest, login_user: Annotated[LoginUser, Depends(get_login_user)]
 ) -> TokenResponse:
-    tokens = await login_user(email=body.email, password=body.password)
-    return TokenResponse(
-        access_token=tokens.access_token,
-        refresh_token=tokens.refresh_token,
-        expires_in=tokens.expires_in,
-    )
+    return token_response(await login_user(email=body.email, password=body.password))
+
+
+@router.post(
+    "/refresh",
+    summary="Renovar la sesión",
+    description="Emite tokens nuevos y revoca el refresh token usado (rotación).",
+    responses={status.HTTP_401_UNAUTHORIZED: {"description": "Refresh token inválido o usado"}},
+)
+async def refresh(body: RefreshRequest, uow: IdentityUow, tokens: Tokens) -> TokenResponse:
+    return token_response(await RefreshSession(uow=uow, tokens=tokens)(body.refresh_token))
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Cerrar la sesión",
+    description="Revoca el refresh token. Cerrar una sesión ya cerrada no es un error.",
+)
+async def logout(body: RefreshRequest, uow: IdentityUow, tokens: Tokens) -> None:
+    await Logout(uow=uow, tokens=tokens)(body.refresh_token)
