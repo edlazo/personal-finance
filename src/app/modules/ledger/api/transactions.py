@@ -5,12 +5,14 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.modules.ledger.api.routes import LedgerUow
 from app.modules.ledger.application.create_transaction import CreateTransaction
+from app.modules.ledger.application.list_transactions import ListTransactions
 from app.modules.ledger.domain.category import CategoryKind
+from app.modules.ledger.domain.transaction import TransactionFilter
 from app.shared.api.auth import CurrentUserId
 
 
@@ -36,6 +38,26 @@ class TransactionResponse(BaseModel):
     date: dt.date
     category_id: UUID
     description: str | None
+
+
+class TransactionQuery(BaseModel):
+    date_from: dt.date | None = Field(None, description="Desde esta fecha (inclusive)")
+    date_to: dt.date | None = Field(None, description="Hasta esta fecha (inclusive)")
+    account_id: UUID | None = None
+    category_id: UUID | None = Field(None, description="Incluye sus subcategorías")
+    kind: CategoryKind | None = None
+    q: str | None = Field(None, max_length=200, description="Texto en la descripción")
+    amount_min: Decimal | None = Field(None, ge=0, decimal_places=2)
+    amount_max: Decimal | None = Field(None, ge=0, decimal_places=2)
+    limit: int = Field(50, ge=1, le=100)
+    offset: int = Field(0, ge=0)
+
+
+class TransactionPageResponse(BaseModel):
+    items: list[TransactionResponse]
+    total: int
+    limit: int
+    offset: int
 
 
 router = APIRouter(
@@ -67,3 +89,31 @@ async def create_transaction(
         description=body.description,
     )
     return TransactionResponse.model_validate(transaction)
+
+
+@router.get(
+    "",
+    summary="Listar mis movimientos",
+    description="Ordenados por fecha, del más reciente al más viejo, con el total para paginar.",
+)
+async def list_transactions(
+    params: Annotated[TransactionQuery, Query()], uow: LedgerUow
+) -> TransactionPageResponse:
+    filters = TransactionFilter(
+        date_from=params.date_from,
+        date_to=params.date_to,
+        account_id=params.account_id,
+        kind=params.kind,
+        text=params.q,
+        amount_min=params.amount_min,
+        amount_max=params.amount_max,
+    )
+    page = await ListTransactions(uow=uow)(
+        filters, category_id=params.category_id, limit=params.limit, offset=params.offset
+    )
+    return TransactionPageResponse(
+        items=[TransactionResponse.model_validate(t) for t in page.items],
+        total=page.total,
+        limit=params.limit,
+        offset=params.offset,
+    )

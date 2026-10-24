@@ -117,3 +117,27 @@ def test_balance_is_derived_from_movements_and_supports_as_of(
 
     assert today["balance"] == "1299.50"
     assert [a["balance"] for a in before if a["id"] == account["id"]] == ["1500.00"]
+
+
+def test_list_filters_paginates_and_sorts_newest_first(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    account_id, categories = setup(client, auth)
+    sueldo, super_ = categories["INCOME:Sueldo"], categories["EXPENSE:Supermercado"]
+    old = expense(client, auth, account_id, super_, date="2026-09-30", amount="100.00").json()
+    pay = expense(client, auth, account_id, sueldo, kind="INCOME", description="Sueldo 100%")
+    new = expense(client, auth, account_id, super_, date="2026-10-24", amount="2000.00").json()
+
+    def ids(**params: Any) -> list[str]:
+        body = client.get("/transactions", headers=auth, params=params).json()
+        return [t["id"] for t in body["items"]]
+
+    page = client.get("/transactions", headers=auth, params={"limit": 2}).json()
+    assert (page["total"], len(page["items"]), page["items"][-1]["date"]) == (3, 2, "2026-10-24")
+    assert ids(offset=2) == ids(date_to="2026-09-30") == [old["id"]]
+    assert ids(date_from="2026-10-01", kind="EXPENSE") == [new["id"]]
+    assert ids(category_id=super_, amount_min="100.00", amount_max="1999.99") == [old["id"]]
+    assert ids(q="100%", account_id=account_id) == [pay.json()["id"]]
+    assert ids(q="_") == []
+    assert client.get("/transactions", headers=sign_up()).json()["total"] == 0
