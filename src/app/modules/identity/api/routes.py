@@ -9,14 +9,15 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.identity.application.login_user import LoginUser
+from app.modules.identity.application.profile import GetProfile, UpdatePreferences
 from app.modules.identity.application.register_user import RegisterUser
 from app.modules.identity.application.sessions import Logout, RefreshSession
-from app.modules.identity.domain.user import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
+from app.modules.identity.domain.user import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, User
 from app.modules.identity.infrastructure.persistence import (
     Argon2PasswordHasher,
     SqlAlchemyIdentityUnitOfWork,
 )
-from app.shared.api.auth import get_token_service
+from app.shared.api.auth import CurrentUserId, get_token_service
 from app.shared.api.dependencies import get_session_factory
 from app.shared.domain.auth import TokenPair
 from app.shared.domain.rates import RateType
@@ -140,3 +141,47 @@ async def refresh(body: RefreshRequest, uow: IdentityUow, tokens: Tokens) -> Tok
 )
 async def logout(body: RefreshRequest, uow: IdentityUow, tokens: Tokens) -> None:
     await Logout(uow=uow, tokens=tokens)(body.refresh_token)
+
+
+class Preferences(BaseModel):
+    default_rate_type: RateType
+
+
+class ProfileResponse(BaseModel):
+    id: UUID
+    email: str
+    name: str
+    preferences: Preferences
+
+
+def profile_response(user: User) -> ProfileResponse:
+    return ProfileResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        preferences=Preferences(default_rate_type=user.default_rate_type),
+    )
+
+
+me_router = APIRouter(
+    prefix="/me",
+    tags=["perfil"],
+    responses={status.HTTP_401_UNAUTHORIZED: {"description": "Token inválido o vencido"}},
+)
+
+
+@me_router.get("", summary="Ver mi perfil")
+async def get_me(user_id: CurrentUserId, uow: IdentityUow) -> ProfileResponse:
+    return profile_response(await GetProfile(uow=uow)(user_id))
+
+
+@me_router.patch(
+    "/preferences",
+    summary="Cambiar mis preferencias",
+    description="Tipo de cotización por defecto para convertir ARS↔USD (MEP si no se elige).",
+)
+async def update_preferences(
+    body: Preferences, user_id: CurrentUserId, uow: IdentityUow
+) -> ProfileResponse:
+    user = await UpdatePreferences(uow=uow)(user_id, default_rate_type=body.default_rate_type)
+    return profile_response(user)
