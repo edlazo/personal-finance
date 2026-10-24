@@ -7,10 +7,10 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
+# Los modelos ORM de cada módulo se importan acá para que autogenerate los detecte.
+import app.modules.identity.infrastructure.models  # noqa: F401
 from app.config import get_settings
 from app.shared.infrastructure.database import Base
-
-# Los modelos ORM de cada módulo se importan acá para que autogenerate los detecte.
 
 target_metadata = Base.metadata
 
