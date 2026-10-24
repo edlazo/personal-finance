@@ -4,8 +4,8 @@ from uuid import uuid4
 import jwt
 import pytest
 
-from app.modules.identity.domain.user import InvalidTokenError
-from app.modules.identity.infrastructure.tokens import JwtTokenService
+from app.shared.domain.auth import InvalidTokenError
+from app.shared.infrastructure.tokens import JwtTokenService
 
 SECRET = "x" * 32
 

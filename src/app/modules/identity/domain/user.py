@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from app.shared.domain.auth import TokenPair
 from app.shared.domain.errors import ConflictError, UnauthorizedError
 from app.shared.domain.rates import RateType
 
@@ -36,18 +37,6 @@ class InvalidCredentialsError(UnauthorizedError):
     def __init__(self) -> None:
         # El mismo mensaje para email inexistente o contraseña incorrecta.
         super().__init__("Email o contraseña incorrectos")
-
-
-class InvalidTokenError(UnauthorizedError):
-    def __init__(self) -> None:
-        super().__init__("Token inválido o vencido")
-
-
-@dataclass(frozen=True)
-class TokenPair:
-    access_token: str
-    refresh_token: str
-    expires_in: int
 
 
 class UserRepository(Protocol):

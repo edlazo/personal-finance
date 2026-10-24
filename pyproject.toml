@@ -97,3 +97,8 @@ name = "ruff_format"
 type = "module"
 module = "ruff"
 options = "format REVISION_SCRIPT_FILENAME"
+
+[[tool.importlinter.contracts]]
+name = "Los módulos no se importan entre sí: lo común vive en app.shared"
+type = "independence"
+modules = ["app.modules.*"]

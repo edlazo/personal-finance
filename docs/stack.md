@@ -87,7 +87,8 @@ HTTP ──▶   │   application (casos de uso, DTOs)  ──▶  domain (enti
 1. `domain` no importa nada de FastAPI, SQLAlchemy, httpx2 ni de otras capas.
 2. `application` depende solo de `domain`.
 3. `infrastructure` y `api` dependen de `application` / `domain`, nunca al revés.
-4. Un módulo usa a otro **solo a través de su capa `application`**, nunca de sus modelos ORM.
+4. Los módulos **no se importan entre sí** (contrato de independencia): lo que comparten vive en `app.shared`. Por ejemplo, el usuario autenticado se obtiene con `CurrentUserId` (`shared/api/auth.py`), aunque los tokens los emita identity.
+5. Todo recurso de un usuario usa `UserOwnedMixin` y un repositorio que hereda de `UserScopedRepository` (`shared/infrastructure/user_scoped.py`): las consultas parten siempre filtradas por `user_id`, y un recurso ajeno responde 404.
 
 ### Estructura
 ```
