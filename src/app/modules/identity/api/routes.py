@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.identity.api.security import get_token_service
 from app.modules.identity.application.login_user import LoginUser
 from app.modules.identity.application.register_user import RegisterUser
 from app.modules.identity.domain.user import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
@@ -16,9 +15,10 @@ from app.modules.identity.infrastructure.persistence import (
     Argon2PasswordHasher,
     SqlAlchemyIdentityUnitOfWork,
 )
-from app.modules.identity.infrastructure.tokens import JwtTokenService
+from app.shared.api.auth import get_token_service
 from app.shared.api.dependencies import get_session_factory
 from app.shared.domain.rates import RateType
+from app.shared.infrastructure.tokens import JwtTokenService
 
 
 class RegisterRequest(BaseModel):

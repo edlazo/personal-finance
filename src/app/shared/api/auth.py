@@ -1,4 +1,4 @@
-"""Autenticación de los endpoints protegidos (Bearer JWT)."""
+"""Usuario autenticado para los endpoints protegidos de cualquier módulo (Bearer JWT)."""
 
 from datetime import timedelta
 from typing import Annotated
@@ -8,8 +8,8 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import Settings
-from app.modules.identity.domain.user import InvalidTokenError
-from app.modules.identity.infrastructure.tokens import JwtTokenService
+from app.shared.domain.auth import InvalidTokenError
+from app.shared.infrastructure.tokens import JwtTokenService
 
 # auto_error=False: sin header respondemos nosotros, como problem+json con WWW-Authenticate.
 bearer = HTTPBearer(auto_error=False)
@@ -31,3 +31,7 @@ def get_current_user_id(
     if credentials is None:
         raise InvalidTokenError
     return tokens.decode_access(credentials.credentials)
+
+
+# Uso: `async def endpoint(user_id: CurrentUserId)`.
+CurrentUserId = Annotated[UUID, Depends(get_current_user_id)]

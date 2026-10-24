@@ -9,8 +9,8 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings
 from app.main import create_app
-from app.modules.identity.api.security import get_current_user_id
-from app.modules.identity.infrastructure.tokens import JwtTokenService
+from app.shared.api.auth import get_current_user_id
+from app.shared.infrastructure.tokens import JwtTokenService
 
 
 def tokens_for(settings: Settings, clock: datetime | None = None) -> JwtTokenService:

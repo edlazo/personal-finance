@@ -4,7 +4,8 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID
 
-from app.modules.identity.domain.user import TokenPair, User
+from app.modules.identity.domain.user import User
+from app.shared.domain.auth import TokenPair
 
 
 class InMemoryUsers:

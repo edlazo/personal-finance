@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import jwt
 
-from app.modules.identity.domain.user import InvalidTokenError, TokenPair
+from app.shared.domain.auth import InvalidTokenError, TokenPair
 
 ALGORITHM = "HS256"
 

@@ -6,10 +6,10 @@ from app.modules.identity.application.register_user import IdentityUnitOfWork
 from app.modules.identity.domain.user import (
     InvalidCredentialsError,
     PasswordHasher,
-    TokenPair,
     TokenService,
     normalize_email,
 )
+from app.shared.domain.auth import TokenPair
 
 
 @dataclass(frozen=True)
