@@ -1,6 +1,4 @@
 from decimal import Decimal
-from types import TracebackType
-from typing import Self
 from uuid import uuid4
 
 import pytest
@@ -11,45 +9,11 @@ from app.modules.accounts.domain.account import (
     AccountNameTakenError,
     AccountType,
     InvalidAccountError,
-    same_name,
 )
 from app.shared.domain.money import Currency
+from fakes.accounts import FakeAccountsUnitOfWork
 
 USER = uuid4()
-
-
-class InMemoryAccounts:
-    def __init__(self) -> None:
-        self.items: list[Account] = []
-
-    async def name_taken(self, name: str) -> bool:
-        return any(same_name(a.name) == same_name(name) for a in self.items if not a.archived_at)
-
-    async def add(self, account: Account) -> None:
-        self.items.append(account)
-
-
-class FakeUnitOfWork:
-    def __init__(self) -> None:
-        self.accounts = InMemoryAccounts()
-        self.committed = False
-
-    async def __aenter__(self) -> Self:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None:
-        pass
-
-    async def commit(self) -> None:
-        self.committed = True
-
-    async def rollback(self) -> None:
-        pass
 
 
 def account(account_type: AccountType = AccountType.SAVINGS, balance: str = "0") -> Account:
@@ -76,7 +40,7 @@ def test_initial_balance_has_at_most_two_decimals_and_name_is_trimmed() -> None:
 
 
 async def test_create_account_rejects_a_repeated_name_ignoring_case() -> None:
-    uow = FakeUnitOfWork()
+    uow = FakeAccountsUnitOfWork()
     create = CreateAccount(uow=uow)
     await create(
         user_id=USER,

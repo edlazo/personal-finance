@@ -34,6 +34,11 @@ class AccountNameTakenError(ConflictError):
         super().__init__("Ya tenés una cuenta activa con ese nombre")
 
 
+class AccountArchivedError(ConflictError):
+    def __init__(self) -> None:
+        super().__init__("La cuenta está archivada y no se puede editar")
+
+
 def same_name(name: str) -> str:
     """Forma de comparar nombres: sin espacios sobrantes ni distinguir mayúsculas.
 
@@ -60,12 +65,34 @@ class Account:
         if self.initial_balance < 0 and self.type not in ALLOWS_NEGATIVE_BALANCE:
             raise InvalidAccountError("Este tipo de cuenta no admite saldo negativo")
 
+    def edit(self, *, name: str | None = None, currency: Currency | None = None) -> None:
+        # Decisión del PO: las archivadas son de solo lectura.
+        if self.archived_at is not None:
+            raise AccountArchivedError
+        if name is not None:
+            self.name = name.strip()
+        if currency is not None:
+            self.currency = currency
+
+    def archive(self) -> None:
+        """Idempotente: archivar una cuenta ya archivada no cambia nada."""
+        if self.archived_at is None:
+            self.archived_at = datetime.now(UTC)
+
 
 class AccountRepository(Protocol):
     """Repositorio de las cuentas de un usuario (ya filtrado por su dueño)."""
 
-    async def name_taken(self, name: str) -> bool:
+    async def name_taken(self, name: str, *, excluding: UUID | None = None) -> bool:
         """Hay otra cuenta activa con ese nombre (comparado con `same_name`)."""
         ...
 
     async def add(self, account: Account) -> None: ...
+
+    async def get_account(self, account_id: UUID) -> Account:
+        """NotFoundError si no existe o es de otro usuario."""
+        ...
+
+    async def list_accounts(self, *, include_archived: bool) -> list[Account]: ...
+
+    async def save(self, account: Account) -> None: ...

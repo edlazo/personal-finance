@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, Index, Numeric, String, func, select, text
+from sqlalchemy import DateTime, Enum, Index, Numeric, String, func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
@@ -47,14 +47,51 @@ class AccountModel(UserOwnedMixin, Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+def _to_domain(model: AccountModel) -> Account:
+    return Account(
+        id=model.id,
+        user_id=model.user_id,
+        name=model.name,
+        type=model.type,
+        currency=model.currency,
+        initial_balance=model.initial_balance,
+        created_at=model.created_at,
+        archived_at=model.archived_at,
+    )
+
+
 class SqlAlchemyAccountRepository(UserScopedRepository[AccountModel]):
     model = AccountModel
 
-    async def name_taken(self, name: str) -> bool:
+    async def name_taken(self, name: str, *, excluding: UUID | None = None) -> bool:
         query = self.scoped().where(
             func.lower(AccountModel.name) == same_name(name), AccountModel.archived_at.is_(None)
         )
+        if excluding is not None:
+            query = query.where(AccountModel.id != excluding)
         return await self.session.scalar(select(query.exists())) or False
+
+    async def get_account(self, account_id: UUID) -> Account:
+        return _to_domain(await self.get(account_id))
+
+    async def list_accounts(self, *, include_archived: bool) -> list[Account]:
+        query = self.scoped().order_by(AccountModel.created_at)
+        if not include_archived:
+            query = query.where(AccountModel.archived_at.is_(None))
+        return [_to_domain(model) for model in await self.session.scalars(query)]
+
+    async def save(self, account: Account) -> None:
+        try:
+            await self.session.execute(
+                update(AccountModel)
+                .where(AccountModel.id == account.id, AccountModel.user_id == self.user_id)
+                .values(
+                    name=account.name, currency=account.currency, archived_at=account.archived_at
+                )
+            )
+        except IntegrityError as exc:
+            # Dos renombres simultáneos al mismo nombre: los frena el índice único.
+            raise AccountNameTakenError from exc
 
     async def add(self, account: Account) -> None:
         self.session.add(

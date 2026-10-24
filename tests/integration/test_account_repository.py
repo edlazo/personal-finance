@@ -10,6 +10,7 @@ from app.modules.accounts.domain.account import Account, AccountNameTakenError, 
 from app.modules.accounts.infrastructure.persistence import SqlAlchemyAccountsUnitOfWork
 from app.modules.identity.domain.user import User
 from app.modules.identity.infrastructure.persistence import SqlAlchemyIdentityUnitOfWork
+from app.shared.domain.errors import NotFoundError
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import create_session_factory
 
@@ -37,7 +38,7 @@ def new_user(
     return create
 
 
-def galicia(user_id: UUID, name: str = "Galicia", archived: bool = False) -> Account:
+def galicia_account(user_id: UUID, name: str = "Galicia", archived: bool = False) -> Account:
     return Account(
         user_id=user_id,
         name=name,
@@ -65,7 +66,7 @@ async def test_name_is_taken_ignoring_case_and_only_for_its_owner(
     session_factory: async_sessionmaker[AsyncSession], new_user: Callable[[], Awaitable[UUID]]
 ) -> None:
     owner, other = await new_user(), await new_user()
-    await save(session_factory, galicia(owner))
+    await save(session_factory, galicia_account(owner))
 
     assert await name_taken(session_factory, owner, "  GALICIA ")
     assert not await name_taken(session_factory, other, "Galicia")
@@ -75,10 +76,10 @@ async def test_archived_accounts_free_their_name(
     session_factory: async_sessionmaker[AsyncSession], new_user: Callable[[], Awaitable[UUID]]
 ) -> None:
     owner = await new_user()
-    await save(session_factory, galicia(owner, archived=True))
+    await save(session_factory, galicia_account(owner, archived=True))
 
     assert not await name_taken(session_factory, owner, "Galicia")
-    await save(session_factory, galicia(owner))
+    await save(session_factory, galicia_account(owner))
 
 
 async def test_unique_index_blocks_simultaneous_duplicates(
@@ -86,7 +87,44 @@ async def test_unique_index_blocks_simultaneous_duplicates(
 ) -> None:
     # Simula dos altas que pasaron a la vez la verificación del caso de uso.
     owner = await new_user()
-    await save(session_factory, galicia(owner))
+    await save(session_factory, galicia_account(owner))
 
     with pytest.raises(AccountNameTakenError):
-        await save(session_factory, galicia(owner, name="galicia"))
+        await save(session_factory, galicia_account(owner, name="galicia"))
+
+
+async def test_list_get_and_save_stay_within_the_owner(
+    session_factory: async_sessionmaker[AsyncSession], new_user: Callable[[], Awaitable[UUID]]
+) -> None:
+    owner, other = await new_user(), await new_user()
+    galicia, santander = galicia_account(owner), galicia_account(owner, name="Santander")
+    for account in (galicia, santander):
+        await save(session_factory, account)
+
+    async with SqlAlchemyAccountsUnitOfWork(session_factory, owner) as uow:
+        santander.archive()
+        await uow.accounts.save(santander)
+        await uow.commit()
+    async with SqlAlchemyAccountsUnitOfWork(session_factory, owner) as uow:
+        assert [a.name for a in await uow.accounts.list_accounts(include_archived=False)] == [
+            "Galicia"
+        ]
+        assert len(await uow.accounts.list_accounts(include_archived=True)) == 2
+        assert (await uow.accounts.get_account(santander.id)).archived_at is not None
+    async with SqlAlchemyAccountsUnitOfWork(session_factory, other) as uow:
+        with pytest.raises(NotFoundError):
+            await uow.accounts.get_account(galicia.id)
+
+
+async def test_unique_index_blocks_a_rename_to_a_taken_name(
+    session_factory: async_sessionmaker[AsyncSession], new_user: Callable[[], Awaitable[UUID]]
+) -> None:
+    owner = await new_user()
+    galicia, santander = galicia_account(owner), galicia_account(owner, name="Santander")
+    for account in (galicia, santander):
+        await save(session_factory, account)
+
+    santander.edit(name="GALICIA")
+    with pytest.raises(AccountNameTakenError):
+        async with SqlAlchemyAccountsUnitOfWork(session_factory, owner) as uow:
+            await uow.accounts.save(santander)
