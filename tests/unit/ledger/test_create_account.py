@@ -3,8 +3,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.accounts.application.create_account import CreateAccount
-from app.modules.accounts.domain.account import (
+from app.modules.ledger.application.create_account import CreateAccount
+from app.modules.ledger.domain.account import (
     Account,
     AccountNameTakenError,
     AccountType,

@@ -6,10 +6,10 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.modules.accounts.domain.account import Account, AccountNameTakenError, AccountType
-from app.modules.accounts.infrastructure.persistence import SqlAlchemyAccountsUnitOfWork
 from app.modules.identity.domain.user import User
 from app.modules.identity.infrastructure.persistence import SqlAlchemyIdentityUnitOfWork
+from app.modules.ledger.domain.account import Account, AccountNameTakenError, AccountType
+from app.modules.ledger.infrastructure.accounts import SqlAlchemyAccountsUnitOfWork
 from app.shared.domain.errors import NotFoundError
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import create_session_factory

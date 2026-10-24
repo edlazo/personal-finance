@@ -4,7 +4,7 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID
 
-from app.modules.accounts.domain.account import Account, same_name
+from app.modules.ledger.domain.account import Account, same_name
 from app.shared.domain.errors import NotFoundError
 
 

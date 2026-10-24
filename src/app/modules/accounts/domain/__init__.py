@@ -1,1 +1,0 @@
-"""Cuenta y sus reglas."""

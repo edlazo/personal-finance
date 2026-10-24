@@ -9,14 +9,14 @@ from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.accounts.application.create_account import CreateAccount
-from app.modules.accounts.application.manage_accounts import (
+from app.modules.ledger.application.create_account import CreateAccount
+from app.modules.ledger.application.manage_accounts import (
     ArchiveAccount,
     ListAccounts,
     UpdateAccount,
 )
-from app.modules.accounts.domain.account import AccountType
-from app.modules.accounts.infrastructure.persistence import SqlAlchemyAccountsUnitOfWork
+from app.modules.ledger.domain.account import AccountType
+from app.modules.ledger.infrastructure.accounts import SqlAlchemyAccountsUnitOfWork
 from app.shared.api.auth import CurrentUserId
 from app.shared.api.dependencies import get_session_factory
 from app.shared.domain.money import Currency
