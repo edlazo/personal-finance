@@ -91,3 +91,28 @@ def test_trades_move_the_broker_account_and_respect_the_holding(
     assert trade("BUY", "1", "1", fee="0").status_code == 201
     other_user = client.post("/trades", headers=sign_up(), json={**bought.json(), "fee": "0"})
     assert other_user.status_code == 404
+
+
+def test_positions_show_cost_result_and_value_in_both_currencies(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    broker = client.post(
+        "/accounts", headers=auth, json={"name": "IOL", "type": "BROKER", "currency": "ARS"}
+    ).json()["id"]
+    ggal = create(client, auth, ticker="GGAL", name="Galicia", type="STOCK").json()["id"]
+    rate = {"type": "MEP", "buy": "1000", "sell": "1250", "quoted_at": "2026-01-02T12:00:00Z"}
+    client.post("/fx/rates", headers=auth, json=rate)
+    for side, quantity, price, fee in (("BUY", "10", "100", "10"), ("SELL", "4", "150", "0")):
+        body = {"account_id": broker, "instrument_id": ggal, "side": side, "date": "2026-10-24"}
+        body |= {"quantity": quantity, "price": price, "fee": fee}
+        client.post("/trades", headers=auth, json=body)
+
+    body = client.get("/positions", headers=auth).json()
+
+    [position] = body["positions"]
+    assert (body["rate_type"], position["instrument"]["ticker"]) == ("MEP", "GGAL")
+    assert (position["quantity"], position["average_price"]) == ("6.00000000", "101.0000000000")
+    assert (position["realized_pnl"], position["valuation"]) == ("196.00", "900.00")
+    assert (position["valuation_ars"], position["valuation_usd"]) == ("900.00", "0.72")
+    assert position["unrealized_pnl_pct"] == "48.51"

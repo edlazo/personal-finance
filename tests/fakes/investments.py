@@ -39,6 +39,9 @@ class InMemoryTrades:
     async def add(self, trade: Trade) -> None:
         self.items.append(trade)
 
+    async def list_trades(self) -> list[Trade]:
+        return list(self.items)
+
     async def holding(self, account_id: UUID, instrument_id: UUID) -> Decimal:
         return sum(
             (

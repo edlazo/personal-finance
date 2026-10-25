@@ -147,6 +147,23 @@ class SqlAlchemyTradeRepository(UserScopedRepository[TradeModel]):
         )
         return Decimal(await self.session.scalar(query) or 0)
 
+    async def list_trades(self) -> list[Trade]:
+        return [
+            Trade(
+                id=m.id,
+                user_id=m.user_id,
+                account_id=m.account_id,
+                instrument_id=m.instrument_id,
+                side=m.side,
+                quantity=m.quantity,
+                price=m.price,
+                fee=m.fee,
+                date=m.date,
+                created_at=m.created_at,
+            )
+            for m in await self.session.scalars(self.scoped())
+        ]
+
 
 # Lo arma main.py con la implementación de ledger (contrato de app.shared).
 CashMovementsFactory = Callable[[AsyncSession, UUID], CashMovements]
