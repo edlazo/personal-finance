@@ -2,16 +2,18 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 from typing import Protocol
 from uuid import UUID, uuid4
 
 from app.shared.domain.errors import DomainError
+from app.shared.domain.money import Currency
 from app.shared.domain.rates import RateType
 
 # NUMERIC(28,10): hasta 10 decimales.
 PRECISION = Decimal("1e-10")
+CENTS = Decimal("0.01")
 
 
 class RateSource(StrEnum):
@@ -48,6 +50,14 @@ class ExchangeRate:
         if (self.source is RateSource.MANUAL) != (self.user_id is not None):
             raise InvalidRateError("Solo las cotizaciones manuales tienen dueño")
 
+    def convert(self, amount: Decimal, source: Currency, target: Currency) -> Decimal:
+        """ARS -> USD divide por la venta (lo que cuesta comprar un dólar); USD -> ARS
+        multiplica por la compra (lo que pagan por venderlo). Redondea a centavos."""
+        if source is target:
+            return amount
+        converted = amount / self.sell if source is Currency.ARS else amount * self.buy
+        return converted.quantize(CENTS, ROUND_HALF_UP)
+
 
 class ExchangeRateProvider(Protocol):
     async def fetch(self) -> list[ExchangeRate]:
@@ -62,6 +72,10 @@ class ExchangeRateRepository(Protocol):
 
     async def latest(self) -> list[ExchangeRate]:
         """La más reciente de cada tipo, ordenadas por tipo."""
+        ...
+
+    async def rate_at(self, rate_type: RateType, at: datetime) -> ExchangeRate | None:
+        """La más reciente del tipo con fecha no posterior a `at`."""
         ...
 
     async def history(

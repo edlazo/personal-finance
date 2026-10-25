@@ -2,7 +2,7 @@ from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,9 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.config import Settings
 from app.main import create_app
+from app.modules.fx.application.currency_converter import CurrencyConverter
 from app.modules.fx.domain.rate import ExchangeRate, RateSource
 from app.modules.fx.infrastructure.jobs import sync_rates
 from app.modules.fx.infrastructure.persistence import ExchangeRateModel, SqlAlchemyFxUnitOfWork
+from app.shared.domain.money import Currency
 from app.shared.domain.rates import RateType
 from app.shared.infrastructure.database import create_session_factory
 
@@ -138,3 +140,27 @@ async def test_the_worker_job_stores_api_rates_once_for_everyone(
             ExchangeRateModel.quoted_at == rate.quoted_at,
         )
         assert await connection.scalar(same_quote) == 1
+
+
+async def test_the_converter_uses_my_rates_and_never_a_later_one(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    ana, beto = sign_up(), sign_up()
+    ana_id = client.get("/me", headers=ana).json()["id"]
+    # 2020: ninguna otra prueba carga BLUE en esas fechas en la base compartida.
+    post_rate(client, ana, type="BLUE", buy="80", sell="81", quoted_at="2020-01-02T12:00:00Z")
+    post_rate(client, ana, type="BLUE", buy="90", sell="91", quoted_at="2020-01-09T12:00:00Z")
+    post_rate(client, beto, type="BLUE", buy="99", sell="99", quoted_at="2020-01-05T12:00:00Z")
+    converter = CurrencyConverter(
+        uow=SqlAlchemyFxUnitOfWork(create_session_factory(engine), UUID(ana_id))
+    )
+
+    converted = await converter.convert(
+        Decimal("10"),
+        Currency.USD,
+        Currency.ARS,
+        rate_type=RateType.BLUE,
+        at=datetime(2020, 1, 6, tzinfo=UTC),
+    )
+
+    assert converted == Decimal("800.00")
