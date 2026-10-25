@@ -94,3 +94,21 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # La imagen solo se publica desde main (docker.yml): acá se construye en cada PR y push
+  # para que un Dockerfile o una dependencia rota no aparezca recién en la release.
+  image:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: personal-finance:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: La API y el worker importan dentro de la imagen
+        run: docker run --rm personal-finance:ci python -c "import app.main, app.worker"

@@ -55,8 +55,9 @@ Se ejecutan en este orden. Si una falla, las siguientes no corren.
 | 4 | `prefix` | El prefijo del **título del PR y de cada commit** está en la lista permitida (ver abajo), el título incluye `[PF-<n>]` y ninguno pasa de 72 caracteres. Dependabot está exento de la key y del largo; en los PRs a `main` el largo de los commits no se valida, porque GitHub les suma ` (#n)` al hacer squash. | Todos |
 | 5 | `lint` | `ruff check` + `ruff format --check` sin cambios: el código subido tiene que ser idéntico a lo que produciría el linter (misma versión de ruff fijada en `requirements-dev.txt`). | Todos |
 | 6 | `typecheck`, `test`, `migrations` | mypy, import-linter, pytest con cobertura ≥ 85 % (Postgres como service), `alembic upgrade head` + `alembic check`. | Todos |
+| 7 | `image` | Construye la imagen Docker sin publicarla y verifica que la API y el worker importan adentro. La publicación es solo desde `main` (`docker.yml`). | Todos |
 
-Los checks 5 y 6 viven en el workflow reutilizable `quality.yml`, que también corre en cada push a `develop` y `main` (`ci.yml`). El prefijo se valida con [`scripts/check_commit_msg.py`](scripts/check_commit_msg.py), el mismo script del hook `commit-msg`.
+Los checks 5 a 7 viven en el workflow reutilizable `quality.yml`, que también corre en cada push a `develop` y `main` (`ci.yml`). El prefijo se valida con [`scripts/check_commit_msg.py`](scripts/check_commit_msg.py), el mismo script del hook `commit-msg`.
 
 **Prefijos permitidos:** `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `style`, `build`, `ci`, `chore`, `revert`.
 
