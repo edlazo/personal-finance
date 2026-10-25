@@ -66,7 +66,7 @@ async def test_transfer_rules() -> None:
 
 
 def test_a_movement_has_a_category_or_belongs_to_a_transfer() -> None:
-    with pytest.raises(InvalidTransactionError, match="categoría o es una transferencia"):
+    with pytest.raises(InvalidTransactionError, match="categoría o es parte de"):
         Transaction(USER, uuid4(), CategoryKind.EXPENSE, Decimal("1.00"), date(2026, 10, 24), None)
 
 

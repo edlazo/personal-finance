@@ -79,6 +79,10 @@ class Account:
         if currency is not None:
             self.currency = currency
 
+    @property
+    def holds_investments(self) -> bool:
+        return self.type in (AccountType.BROKER, AccountType.CRYPTO_WALLET)
+
     def archive(self) -> None:
         """Idempotente: archivar una cuenta ya archivada no cambia nada."""
         if self.archived_at is None:

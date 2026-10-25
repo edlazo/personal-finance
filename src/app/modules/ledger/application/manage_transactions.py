@@ -18,6 +18,10 @@ from app.modules.ledger.domain.transaction import (
 async def _editable_legs(uow: TransactionsUnitOfWork, transaction_id: UUID) -> list[Transaction]:
     """El movimiento, o las dos patas si es una transferencia; nunca de una cuenta archivada."""
     transaction = await uow.transactions.get_transaction(transaction_id)
+    if transaction.trade_id is not None:
+        raise InvalidTransactionError(
+            "Los movimientos de una operación de inversión no se editan ni se borran"
+        )
     legs = [transaction]
     if transaction.transfer_group_id is not None:
         legs = await uow.transactions.transfer_legs(transaction.transfer_group_id)

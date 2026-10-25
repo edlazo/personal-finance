@@ -31,15 +31,17 @@ class TransactionModel(UserOwnedMixin, Base):
     # El listado (PF-34) filtra por usuario y ordena por fecha.
     __table_args__ = (
         Index("ix_transactions_user_id_date", "user_id", "date"),
-        # Con categoría (ingreso o gasto) o pata de una transferencia, nunca ambas.
+        # Con categoría (ingreso o gasto), pata de una transferencia o de una operación: una sola.
         CheckConstraint(
-            "(category_id IS NULL) <> (transfer_group_id IS NULL)", name="category_or_transfer"
+            "num_nonnulls(category_id, transfer_group_id, trade_id) = 1",
+            name="category_transfer_or_trade",
         ),
     )
 
     account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.id"), index=True)
     category_id: Mapped[UUID | None] = mapped_column(ForeignKey("categories.id"), index=True)
     transfer_group_id: Mapped[UUID | None] = mapped_column(index=True)
+    trade_id: Mapped[UUID | None] = mapped_column(index=True)
     kind: Mapped[CategoryKind] = mapped_column(
         Enum(CategoryKind, name="transaction_kind", native_enum=False, length=10)
     )
@@ -64,6 +66,7 @@ class SqlAlchemyTransactionRepository(UserScopedRepository[TransactionModel]):
                 date=transaction.date,
                 description=transaction.description,
                 transfer_group_id=transaction.transfer_group_id,
+                trade_id=transaction.trade_id,
                 created_at=transaction.created_at,
             )
         )
@@ -136,5 +139,6 @@ def _to_domain(model: TransactionModel) -> Transaction:
         category_id=model.category_id,
         description=model.description,
         transfer_group_id=model.transfer_group_id,
+        trade_id=model.trade_id,
         created_at=model.created_at,
     )

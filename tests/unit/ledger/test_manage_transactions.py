@@ -119,3 +119,16 @@ async def test_in_a_dollar_purchase_only_the_edited_leg_changes_its_amount(
         (Decimal("125000"), date(2026, 10, 1)),
         (Decimal("99"), date(2026, 10, 1)),
     }
+
+
+async def test_movements_of_an_investment_trade_are_read_only(uow: FakeLedgerUnitOfWork) -> None:
+    galicia = account(uow)
+    movement = Transaction(USER, galicia.id, EXPENSE, Decimal("10.00"), DAY, None, trade_id=uuid4())
+    uow.transactions.items.append(movement)
+
+    with pytest.raises(InvalidTransactionError, match="operación de inversión"):
+        await UpdateTransaction(uow=uow)(movement.id, amount=Decimal("1.00"))
+    with pytest.raises(InvalidTransactionError, match="operación de inversión"):
+        await DeleteTransaction(uow=uow)(movement.id)
+    with pytest.raises(InvalidTransactionError, match="categoría o es parte de"):
+        Transaction(USER, galicia.id, EXPENSE, Decimal("1.00"), DAY, uuid4(), trade_id=uuid4())
