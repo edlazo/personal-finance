@@ -71,6 +71,21 @@ class InMemoryTransactions:
         found.sort(key=lambda t: (t.date, t.created_at), reverse=True)
         return found[offset : offset + limit], len(found)
 
+    async def get_transaction(self, transaction_id: UUID) -> Transaction:
+        for transaction in self.items:
+            if transaction.id == transaction_id:
+                return transaction
+        raise NotFoundError("El recurso no existe")
+
+    async def transfer_legs(self, group_id: UUID) -> list[Transaction]:
+        return [t for t in self.items if t.transfer_group_id == group_id]
+
+    async def save(self, transaction: Transaction) -> None:
+        self.items = [transaction if t.id == transaction.id else t for t in self.items]
+
+    async def delete(self, transaction_id: UUID) -> None:
+        self.items = [t for t in self.items if t.id != transaction_id]
+
 
 class FakeLedgerUnitOfWork:
     def __init__(self) -> None:
