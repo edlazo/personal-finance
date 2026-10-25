@@ -85,6 +85,9 @@ class SqlAlchemyInstrumentRepository(UserScopedRepository[InstrumentModel]):
         query = self.scoped().order_by(InstrumentModel.market, InstrumentModel.ticker)
         return [_to_domain(model) for model in await self.session.scalars(query)]
 
+    async def get_instrument(self, instrument_id: UUID) -> Instrument:
+        return _to_domain(await self.get(instrument_id))
+
 
 class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
     instruments: SqlAlchemyInstrumentRepository

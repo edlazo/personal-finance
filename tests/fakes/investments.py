@@ -1,9 +1,15 @@
 """Dobles en memoria para los casos de uso de inversiones."""
 
+from datetime import date
+from decimal import Decimal
 from types import TracebackType
 from typing import Self
+from uuid import UUID
 
 from app.modules.investments.domain.instrument import Instrument, Market
+from app.modules.investments.domain.trade import Trade, TradeSide
+from app.shared.domain.cash import CashAccount
+from app.shared.domain.errors import NotFoundError
 
 
 class InMemoryInstruments:
@@ -19,10 +25,61 @@ class InMemoryInstruments:
     async def list_instruments(self) -> list[Instrument]:
         return sorted(self.items, key=lambda i: (i.market, i.ticker))
 
+    async def get_instrument(self, instrument_id: UUID) -> Instrument:
+        for instrument in self.items:
+            if instrument.id == instrument_id:
+                return instrument
+        raise NotFoundError("El recurso no existe")
+
+
+class InMemoryTrades:
+    def __init__(self) -> None:
+        self.items: list[Trade] = []
+
+    async def add(self, trade: Trade) -> None:
+        self.items.append(trade)
+
+    async def holding(self, account_id: UUID, instrument_id: UUID) -> Decimal:
+        return sum(
+            (
+                t.quantity if t.side is TradeSide.BUY else -t.quantity
+                for t in self.items
+                if (t.account_id, t.instrument_id) == (account_id, instrument_id)
+            ),
+            Decimal("0"),
+        )
+
+
+class FakeCash:
+    """Las cuentas de ledger que ve investments y los movimientos que pidió."""
+
+    def __init__(self) -> None:
+        self.accounts: dict[UUID, CashAccount] = {}
+        self.recorded: list[tuple[UUID, Decimal, bool]] = []
+
+    async def account(self, account_id: UUID) -> CashAccount:
+        if account_id not in self.accounts:
+            raise NotFoundError("El recurso no existe")
+        return self.accounts[account_id]
+
+    async def record_trade(
+        self,
+        account_id: UUID,
+        amount: Decimal,
+        *,
+        incoming: bool,
+        on: date,
+        trade_id: UUID,
+        description: str,
+    ) -> None:
+        self.recorded.append((account_id, amount, incoming))
+
 
 class FakeInvestmentsUnitOfWork:
     def __init__(self) -> None:
         self.instruments = InMemoryInstruments()
+        self.trades = InMemoryTrades()
+        self.cash = FakeCash()
         self.commits = 0
 
     async def __aenter__(self) -> Self:
