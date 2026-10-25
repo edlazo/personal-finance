@@ -1,10 +1,23 @@
 """Tabla, repositorio y Unit of Work de los instrumentos."""
 
-from datetime import datetime
+from collections.abc import Callable
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, String, UniqueConstraint, select
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+    case,
+    func,
+    select,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
@@ -15,6 +28,8 @@ from app.modules.investments.domain.instrument import (
     InstrumentType,
     Market,
 )
+from app.modules.investments.domain.trade import Trade, TradeSide
+from app.shared.domain.cash import CashMovements
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import Base
 from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -37,6 +52,21 @@ class InstrumentModel(UserOwnedMixin, Base):
     currency: Mapped[Currency] = mapped_column(
         Enum(Currency, name="currency", native_enum=False, length=3)
     )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class TradeModel(UserOwnedMixin, Base):
+    __tablename__ = "trades"
+
+    account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.id"), index=True)
+    instrument_id: Mapped[UUID] = mapped_column(ForeignKey("instruments.id"), index=True)
+    side: Mapped[TradeSide] = mapped_column(
+        Enum(TradeSide, name="trade_side", native_enum=False, length=4)
+    )
+    quantity: Mapped[Decimal] = mapped_column(Numeric(28, 8))
+    price: Mapped[Decimal] = mapped_column(Numeric(28, 10))
+    fee: Mapped[Decimal] = mapped_column(Numeric(20, 2))
+    date: Mapped[date] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -89,14 +119,58 @@ class SqlAlchemyInstrumentRepository(UserScopedRepository[InstrumentModel]):
         return _to_domain(await self.get(instrument_id))
 
 
+class SqlAlchemyTradeRepository(UserScopedRepository[TradeModel]):
+    model = TradeModel
+
+    async def add(self, trade: Trade) -> None:
+        self.session.add(
+            TradeModel(
+                id=trade.id,
+                user_id=trade.user_id,
+                account_id=trade.account_id,
+                instrument_id=trade.instrument_id,
+                side=trade.side,
+                quantity=trade.quantity,
+                price=trade.price,
+                fee=trade.fee,
+                date=trade.date,
+                created_at=trade.created_at,
+            )
+        )
+        await self.session.flush()
+
+    async def holding(self, account_id: UUID, instrument_id: UUID) -> Decimal:
+        m = TradeModel
+        signed = case((m.side == TradeSide.BUY, m.quantity), else_=-m.quantity)
+        query = select(func.coalesce(func.sum(signed), 0)).where(
+            m.user_id == self.user_id, m.account_id == account_id, m.instrument_id == instrument_id
+        )
+        return Decimal(await self.session.scalar(query) or 0)
+
+
+# Lo arma main.py con la implementación de ledger (contrato de app.shared).
+CashMovementsFactory = Callable[[AsyncSession, UUID], CashMovements]
+
+
 class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
     instruments: SqlAlchemyInstrumentRepository
+    trades: SqlAlchemyTradeRepository
+    cash: CashMovements
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], user_id: UUID) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        user_id: UUID,
+        cash: CashMovementsFactory,
+    ) -> None:
         super().__init__(session_factory)
         self._user_id = user_id
+        self._cash = cash
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
         self.instruments = SqlAlchemyInstrumentRepository(self.session, self._user_id)
+        self.trades = SqlAlchemyTradeRepository(self.session, self._user_id)
+        # Misma sesión: la operación y el movimiento de ledger se confirman juntos.
+        self.cash = self._cash(self.session, self._user_id)
         return self

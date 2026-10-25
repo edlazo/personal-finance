@@ -14,10 +14,12 @@ from app.modules.identity.api.routes import router as auth_router
 from app.modules.identity.application.profile import UserRatePreference
 from app.modules.identity.infrastructure.persistence import SqlAlchemyIdentityUnitOfWork
 from app.modules.investments.api.routes import router as instruments_router
+from app.modules.investments.api.routes import trades_router
 from app.modules.ledger.api.accounts import router as accounts_router
 from app.modules.ledger.api.routes import router as categories_router
 from app.modules.ledger.api.transactions import router as transactions_router
 from app.modules.ledger.api.transfers import router as transfers_router
+from app.modules.ledger.infrastructure.cash_movements import LedgerCashMovements
 from app.shared.api.health import router as health_router
 from app.shared.api.middleware import request_logging
 from app.shared.api.problems import register_problem_handlers
@@ -49,6 +51,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.rate_preference = lambda session_factory: UserRatePreference(
         uow=SqlAlchemyIdentityUnitOfWork(session_factory)
     )
+    # Con la sesión de investments: la operación y su movimiento van en una transacción.
+    app.state.cash_movements = LedgerCashMovements
     app.middleware("http")(request_logging)
     register_problem_handlers(app)
     app.include_router(health_router)
@@ -60,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(transfers_router)
     app.include_router(fx_router)
     app.include_router(instruments_router)
+    app.include_router(trades_router)
     return app
 
 
