@@ -75,6 +75,17 @@ class SqlAlchemyExchangeRateRepository:
         )
         return [_to_domain(model) for model in await self.session.scalars(query)]
 
+    async def rate_at(self, rate_type: RateType, at: datetime) -> ExchangeRate | None:
+        m = ExchangeRateModel
+        query = (
+            self.visible()
+            .where(m.type == rate_type, m.quoted_at <= at)
+            .order_by(m.quoted_at.desc(), m.created_at.desc())
+            .limit(1)
+        )
+        model = await self.session.scalar(query)
+        return None if model is None else _to_domain(model)
+
     async def history(
         self, rate_type: RateType | None, *, since: datetime | None, until: datetime | None
     ) -> list[ExchangeRate]:

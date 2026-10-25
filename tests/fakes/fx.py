@@ -21,6 +21,10 @@ class InMemoryRates:
             newest[rate.type] = rate
         return list(newest.values())
 
+    async def rate_at(self, rate_type: RateType, at: datetime) -> ExchangeRate | None:
+        found = [r for r in self.items if r.type is rate_type and r.quoted_at <= at]
+        return max(found, key=lambda r: r.quoted_at, default=None)
+
     # shortcut: el historial solo se usa contra Postgres (tests de integración).
 
     async def history(
