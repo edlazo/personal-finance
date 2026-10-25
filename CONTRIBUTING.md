@@ -52,7 +52,7 @@ Se ejecutan en este orden. Si una falla, las siguientes no corren.
 | 2 | `pr-rules / size` | **additions + deletions ≤ 400**. No cuentan `migrations/versions/**`, `docs/**`, `requirements*.txt`, `frontend/package-lock.json` ni `frontend/src/components/ui/**` (componentes generados por shadcn). | PRs a `develop` |
 | 3 | `pr-rules / branch-name` | La rama respeta `feature|fix|hotfix|chore/PF-<n>-<slug>`. Dependabot está exento. | PRs a `develop` |
 | — | `pr-rules / origin` | A `main` solo llegan PRs desde `develop` o `hotfix/*`. | PRs a `main` |
-| 4 | `prefix` | El prefijo del **título del PR y de cada commit** está en la lista permitida (ver abajo) y el título incluye `[PF-<n>]`. Dependabot está exento de la key. | Todos |
+| 4 | `prefix` | El prefijo del **título del PR y de cada commit** está en la lista permitida (ver abajo), el título incluye `[PF-<n>]` y ninguno pasa de 72 caracteres. Dependabot está exento de la key y del largo; en los PRs a `main` el largo de los commits no se valida, porque GitHub les suma ` (#n)` al hacer squash. | Todos |
 | 5 | `lint` | `ruff check` + `ruff format --check` sin cambios: el código subido tiene que ser idéntico a lo que produciría el linter (misma versión de ruff fijada en `requirements-dev.txt`). | Todos |
 | 6 | `typecheck`, `test`, `migrations` | mypy, import-linter, pytest con cobertura ≥ 85 % (Postgres como service), `alembic upgrade head` + `alembic check`. | Todos |
 
