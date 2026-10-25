@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.config import Settings
 from app.main import create_app
 from app.modules.fx.domain.rate import ExchangeRate, RateSource
+from app.modules.fx.infrastructure.jobs import sync_rates
 from app.modules.fx.infrastructure.persistence import ExchangeRateModel, SqlAlchemyFxUnitOfWork
 from app.shared.domain.rates import RateType
 from app.shared.infrastructure.database import create_session_factory
@@ -107,3 +108,33 @@ async def test_latest_and_history_show_api_rates_and_only_my_manual_ones(
     everything = client.get("/fx/rates", headers=ana).json()
     assert {newest["id"], str(api.id)} <= {r["id"] for r in everything}
     assert client.get("/fx/rates", headers=ana, params={"from": "2026-10-24"}).status_code == 422
+
+
+class FixedProvider:
+    def __init__(self, *rates: ExchangeRate) -> None:
+        self.rates = list(rates)
+
+    async def fetch(self) -> list[ExchangeRate]:
+        return self.rates
+
+
+async def test_the_worker_job_stores_api_rates_once_for_everyone(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    # CRIPTO y fecha actual: no pisa la "última" que miran los otros tests de la base compartida.
+    rate = ExchangeRate(
+        RateType.CRIPTO, Decimal("1500"), Decimal("1520"), datetime.now(UTC), RateSource.API
+    )
+    provider = FixedProvider(rate)
+
+    await sync_rates(create_session_factory(engine), provider)
+    await sync_rates(create_session_factory(engine), provider)
+
+    latest = {r["type"]: r for r in client.get("/fx/rates/latest", headers=sign_up()).json()}
+    assert (latest["CRIPTO"]["id"], latest["CRIPTO"]["source"]) == (str(rate.id), "API")
+    async with engine.connect() as connection:
+        same_quote = select(func.count()).where(
+            ExchangeRateModel.type == RateType.CRIPTO,
+            ExchangeRateModel.quoted_at == rate.quoted_at,
+        )
+        assert await connection.scalar(same_quote) == 1

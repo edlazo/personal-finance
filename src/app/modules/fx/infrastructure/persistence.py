@@ -39,7 +39,9 @@ class ExchangeRateModel(Base):
 
 
 class SqlAlchemyExchangeRateRepository:
-    def __init__(self, session: AsyncSession, user_id: UUID) -> None:
+    """Sin usuario (`user_id=None`, el worker) solo ve las cotizaciones de la API."""
+
+    def __init__(self, session: AsyncSession, user_id: UUID | None) -> None:
         self.session = session
         self.user_id = user_id
 
@@ -103,7 +105,9 @@ def _to_domain(model: ExchangeRateModel) -> ExchangeRate:
 class SqlAlchemyFxUnitOfWork(SqlAlchemyUnitOfWork):
     rates: SqlAlchemyExchangeRateRepository
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], user_id: UUID) -> None:
+    def __init__(
+        self, session_factory: async_sessionmaker[AsyncSession], user_id: UUID | None
+    ) -> None:
         super().__init__(session_factory)
         self._user_id = user_id
 
