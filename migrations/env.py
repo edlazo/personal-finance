@@ -7,6 +7,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
+import app.modules.fx.infrastructure.persistence
 import app.modules.identity.infrastructure.models
 
 # Los modelos ORM de cada módulo se importan acá para que autogenerate los detecte.

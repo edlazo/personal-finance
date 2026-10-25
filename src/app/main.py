@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import Settings, get_settings
+from app.modules.fx.api.routes import router as fx_router
 from app.modules.identity.api.routes import me_router
 from app.modules.identity.api.routes import router as auth_router
 from app.modules.ledger.api.accounts import router as accounts_router
@@ -45,6 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(categories_router)
     app.include_router(transactions_router)
     app.include_router(transfers_router)
+    app.include_router(fx_router)
     return app
 
 
