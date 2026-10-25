@@ -170,3 +170,35 @@ def test_transfer_moves_money_between_own_accounts(
     assert send(galicia, galicia).status_code == 422
     assert send(galicia, usd).status_code == 422
     assert send(galicia, caja, headers=sign_up()).status_code == 404
+
+
+def test_edit_and_delete_movements_and_transfers(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    galicia, categories = setup(client, auth)
+    movement = expense(client, auth, galicia, categories["EXPENSE:Ocio"]).json()["id"]
+    caja = client.post(
+        "/accounts", headers=auth, json={"name": "Caja", "type": "CASH", "currency": "ARS"}
+    ).json()["id"]
+    body = {"from_account_id": galicia, "to_account_id": caja, "amount": "300.00"}
+    legs = client.post("/transfers", headers=auth, json=body | {"date": "2026-10-24"}).json()
+
+    edited = client.patch(
+        f"/transactions/{movement}",
+        headers=auth,
+        json={"amount": "99.90", "category_id": categories["EXPENSE:Supermercado"]},
+    )
+    moved = client.patch(
+        f"/transactions/{legs['incoming']['id']}", headers=auth, json={"amount": "250.00"}
+    )
+    balances = {a["name"]: a["balance"] for a in client.get("/accounts", headers=auth).json()}
+
+    assert (edited.status_code, edited.json()["amount"]) == (200, "99.90")
+    assert moved.json()["amount"] == "250.00"
+    assert balances == {"Galicia": "-349.90", "Caja": "250.00"}
+    other = sign_up()
+    assert client.delete(f"/transactions/{movement}", headers=other).status_code == 404
+    assert client.delete(f"/transactions/{legs['outgoing']['id']}", headers=auth).status_code == 204
+    assert client.delete(f"/transactions/{movement}", headers=auth).status_code == 204
+    assert client.get("/transactions", headers=auth).json()["total"] == 0

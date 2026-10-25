@@ -11,6 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from app.modules.ledger.api.routes import LedgerUow
 from app.modules.ledger.application.create_transaction import CreateTransaction
 from app.modules.ledger.application.list_transactions import ListTransactions
+from app.modules.ledger.application.manage_transactions import (
+    DeleteTransaction,
+    UpdateTransaction,
+)
 from app.modules.ledger.domain.category import CategoryKind
 from app.modules.ledger.domain.transaction import TransactionFilter
 from app.shared.api.auth import CurrentUserId
@@ -25,6 +29,17 @@ class CreateTransactionRequest(BaseModel):
     amount: Amount
     date: dt.date
     category_id: UUID
+    description: Description = None
+
+
+class UpdateTransactionRequest(BaseModel):
+    """Lo que no se manda no cambia; `"description": ""` la borra."""
+
+    account_id: UUID | None = None
+    kind: CategoryKind | None = None
+    amount: Amount | None = None
+    date: dt.date | None = None
+    category_id: UUID | None = None
     description: Description = None
 
 
@@ -120,3 +135,37 @@ async def list_transactions(
         limit=params.limit,
         offset=params.offset,
     )
+
+
+@router.patch(
+    "/{transaction_id}",
+    summary="Editar un movimiento",
+    description=(
+        "En una transferencia solo se editan monto, fecha y descripción, y cambian las dos patas."
+    ),
+    responses={status.HTTP_409_CONFLICT: {"description": "La cuenta está archivada"}},
+)
+async def update_transaction(
+    transaction_id: UUID, body: UpdateTransactionRequest, uow: LedgerUow
+) -> TransactionResponse:
+    transaction = await UpdateTransaction(uow=uow)(
+        transaction_id,
+        account_id=body.account_id,
+        kind=body.kind,
+        category_id=body.category_id,
+        amount=body.amount,
+        on=body.date,
+        description=body.description,
+    )
+    return TransactionResponse.model_validate(transaction)
+
+
+@router.delete(
+    "/{transaction_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Borrar un movimiento",
+    description="Lo borra definitivamente; si es una transferencia, borra las dos patas.",
+    responses={status.HTTP_409_CONFLICT: {"description": "La cuenta está archivada"}},
+)
+async def delete_transaction(transaction_id: UUID, uow: LedgerUow) -> None:
+    await DeleteTransaction(uow=uow)(transaction_id)

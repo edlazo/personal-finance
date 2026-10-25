@@ -13,8 +13,10 @@ from sqlalchemy import (
     Index,
     Numeric,
     String,
+    delete,
     func,
     select,
+    update,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -93,6 +95,34 @@ class SqlAlchemyTransactionRepository(UserScopedRepository[TransactionModel]):
         page = query.order_by(m.date.desc(), m.created_at.desc(), m.id.desc())
         models = await self.session.scalars(page.limit(limit).offset(offset))
         return [_to_domain(model) for model in models], total or 0
+
+    async def get_transaction(self, transaction_id: UUID) -> Transaction:
+        return _to_domain(await self.get(transaction_id))
+
+    async def transfer_legs(self, group_id: UUID) -> list[Transaction]:
+        query = self.scoped().where(TransactionModel.transfer_group_id == group_id)
+        return [_to_domain(model) for model in await self.session.scalars(query)]
+
+    async def save(self, transaction: Transaction) -> None:
+        await self.session.execute(
+            update(TransactionModel)
+            .where(TransactionModel.id == transaction.id, TransactionModel.user_id == self.user_id)
+            .values(
+                account_id=transaction.account_id,
+                category_id=transaction.category_id,
+                kind=transaction.kind,
+                amount=transaction.amount,
+                date=transaction.date,
+                description=transaction.description,
+            )
+        )
+
+    async def delete(self, transaction_id: UUID) -> None:
+        await self.session.execute(
+            delete(TransactionModel).where(
+                TransactionModel.id == transaction_id, TransactionModel.user_id == self.user_id
+            )
+        )
 
 
 def _to_domain(model: TransactionModel) -> Transaction:
