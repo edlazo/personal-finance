@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
+from uuid import UUID
 
 from app.shared.domain.errors import DomainError
 from app.shared.domain.money import Currency
@@ -36,3 +37,9 @@ class MoneyConverter(Protocol):
     ) -> Decimal:
         """Usa la última cotización del tipo hasta `at`; si no hay, RateNotAvailableError."""
         ...
+
+
+class RatePreference(Protocol):
+    """Lo implementa identity: la cotización que el usuario eligió por defecto."""
+
+    async def default_rate_type(self, user_id: UUID) -> RateType: ...

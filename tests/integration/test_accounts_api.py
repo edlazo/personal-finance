@@ -124,3 +124,24 @@ def test_a_user_gets_404_on_another_users_accounts(
     )
     assert client.delete(f"/accounts/{account_id}", headers=beto).status_code == 404
     assert client.get("/accounts", headers=ana).json()[0]["archived_at"] is None
+
+
+def test_summary_converts_every_account_with_my_preferred_rate(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    create(client, auth, name="Galicia", initial_balance="125000.00")
+    create(client, auth, name="Dólares", currency="USD", initial_balance="100.00")
+    # Recién registrado prefiere MEP; la cotización manual es solo de este usuario.
+    rate = {"type": "MEP", "buy": "1200", "sell": "1250", "quoted_at": "2026-01-02T12:00:00Z"}
+    client.post("/fx/rates", headers=auth, json=rate)
+
+    summary = client.get("/accounts/summary", headers=auth)
+    no_blue = client.get("/accounts/summary", headers=auth, params={"rate_type": "BLUE"})
+
+    body = summary.json()
+    rows = [(a["name"], a["balance_ars"], a["balance_usd"]) for a in body["accounts"]]
+    assert (summary.status_code, body["rate_type"]) == (200, "MEP")
+    assert rows == [("Galicia", "125000.00", "100.00"), ("Dólares", "120000.00", "100.00")]
+    assert (body["total_ars"], body["total_usd"]) == ("245000.00", "200.00")
+    assert no_blue.status_code == 422

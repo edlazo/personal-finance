@@ -17,11 +17,14 @@ from app.modules.ledger.application.manage_accounts import (
     ListAccounts,
     UpdateAccount,
 )
+from app.modules.ledger.application.summarize_accounts import SummarizeAccounts
 from app.modules.ledger.domain.account import AccountType
 from app.modules.ledger.infrastructure.accounts import SqlAlchemyAccountsUnitOfWork
 from app.shared.api.auth import CurrentUserId
+from app.shared.api.contracts import Converter, Preference
 from app.shared.api.dependencies import get_session_factory
 from app.shared.domain.money import Currency
+from app.shared.domain.rates import RateType
 
 
 class CreateAccountRequest(BaseModel):
@@ -59,6 +62,18 @@ class AccountBalanceResponse(AccountResponse):
 def balance_response(item: AccountBalance) -> AccountBalanceResponse:
     account = AccountResponse.model_validate(item.account).model_dump()
     return AccountBalanceResponse(**account, balance=item.balance)
+
+
+class AccountSummaryItem(AccountBalanceResponse):
+    balance_ars: Decimal
+    balance_usd: Decimal
+
+
+class AccountsSummaryResponse(BaseModel):
+    rate_type: RateType
+    accounts: list[AccountSummaryItem]
+    total_ars: Decimal
+    total_usd: Decimal
 
 
 AsOf = Annotated[date | None, Query(description="Saldo a esa fecha (inclusive)")]
@@ -113,6 +128,33 @@ async def list_accounts(
 ) -> list[AccountBalanceResponse]:
     accounts = await ListAccounts(uow=uow)(include_archived=include_archived, as_of=as_of)
     return [balance_response(item) for item in accounts]
+
+
+# Antes de /{account_id}: si no, "summary" se toma como un id.
+@router.get(
+    "/summary",
+    summary="Mis cuentas y el total en ARS y USD",
+    description="Convierte con la última cotización del tipo elegido; 422 si no hay ninguna.",
+)
+async def accounts_summary(
+    user_id: CurrentUserId,
+    uow: AccountsUow,
+    converter: Converter,
+    preference: Preference,
+    rate_type: Annotated[RateType | None, Query(description="Sin valor: mi preferida")] = None,
+) -> AccountsSummaryResponse:
+    summary = await SummarizeAccounts(uow, converter, preference)(user_id, rate_type=rate_type)
+    return AccountsSummaryResponse(
+        rate_type=summary.rate_type,
+        accounts=[
+            AccountSummaryItem(
+                **balance_response(a.item).model_dump(), balance_ars=a.ars, balance_usd=a.usd
+            )
+            for a in summary.accounts
+        ],
+        total_ars=summary.total_ars,
+        total_usd=summary.total_usd,
+    )
 
 
 @router.get("/{account_id}", summary="Ver una cuenta con su saldo")
