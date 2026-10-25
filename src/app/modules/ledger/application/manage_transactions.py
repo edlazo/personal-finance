@@ -50,6 +50,15 @@ class UpdateTransaction:
                 raise InvalidTransactionError(
                     "En una transferencia solo se editan el monto, la fecha y la descripción"
                 )
+            # Compra o venta de dólares: cada pata tiene su monto y solo cambia la editada.
+            accounts = [await self.uow.accounts.get_account(leg.account_id) for leg in legs]
+            own_amounts = len({account.currency for account in accounts}) > 1
+
+            def new_amount(leg: Transaction) -> Decimal:
+                if amount is None or (own_amounts and leg.id != transaction_id):
+                    return leg.amount
+                return amount
+
             # replace() vuelve a validar el monto y limpia la descripción.
             edited = [
                 replace(
@@ -57,7 +66,7 @@ class UpdateTransaction:
                     account_id=account_id or leg.account_id,
                     kind=kind or leg.kind,
                     category_id=category_id or leg.category_id,
-                    amount=leg.amount if amount is None else amount,
+                    amount=new_amount(leg),
                     date=on or leg.date,
                     description=leg.description if description is None else description,
                 )

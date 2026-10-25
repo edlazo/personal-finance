@@ -24,6 +24,7 @@ DEFAULT_CATEGORIES: dict[CategoryKind, tuple[str, ...]] = {
         "Ocio",
         "Educación",
         "Impuestos",
+        "Comisiones",
         "Otros",
     ),
     CategoryKind.INCOME: ("Sueldo", "Freelance", "Rentas", "Otros"),

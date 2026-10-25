@@ -202,3 +202,37 @@ def test_edit_and_delete_movements_and_transfers(
     assert client.delete(f"/transactions/{legs['outgoing']['id']}", headers=auth).status_code == 204
     assert client.delete(f"/transactions/{movement}", headers=auth).status_code == 204
     assert client.get("/transactions", headers=auth).json()["total"] == 0
+
+
+def test_buying_dollars_with_a_fee(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    galicia, _ = setup(client, auth)
+    dolares = client.post(
+        "/accounts", headers=auth, json={"name": "Dólares", "type": "SAVINGS", "currency": "USD"}
+    ).json()["id"]
+    body = {"from_account_id": galicia, "to_account_id": dolares, "date": "2026-10-24"}
+
+    bought = client.post(
+        "/transfers",
+        headers=auth,
+        json=body | {"amount": "125000.00", "to_amount": "100.00", "fee": "500.00"},
+    )
+    missing = client.post("/transfers", headers=auth, json=body | {"amount": "10.00"})
+    edited = client.patch(
+        f"/transactions/{bought.json()['incoming']['id']}", headers=auth, json={"amount": "99.50"}
+    )
+    balances = {a["name"]: a["balance"] for a in client.get("/accounts", headers=auth).json()}
+    fee_category = client.get("/categories", headers=auth).json()
+
+    assert bought.status_code == 201
+    assert (bought.json()["exchange_rate"], bought.json()["fee"]["amount"]) == (
+        "1250.0000",
+        "500.00",
+    )
+    names = {c["id"]: c["name"] for c in fee_category}
+    assert names[bought.json()["fee"]["category_id"]] == "Comisiones"
+    assert missing.status_code == 422
+    assert edited.json()["amount"] == "99.50"
+    assert balances == {"Galicia": "-125500.00", "Dólares": "99.50"}

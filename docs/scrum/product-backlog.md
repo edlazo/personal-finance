@@ -214,7 +214,7 @@ _Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD)._
 **Como** usuario nuevo, **quiero** tener categorías de ingresos y gastos precargadas, **para** empezar a registrar sin configurar nada.
 
 **Criterios de aceptación**
-- [ ] Al registrarse se crean categorías de gasto (Supermercado, Servicios, Alquiler, Transporte, Salud, Ocio, Educación, Impuestos, Otros) e ingreso (Sueldo, Freelance, Rentas, Otros)
+- [ ] Al registrarse se crean categorías de gasto (Supermercado, Servicios, Alquiler, Transporte, Salud, Ocio, Educación, Impuestos, Comisiones, Otros) e ingreso (Sueldo, Freelance, Rentas, Otros). _Comisiones se sumó con US-020 (Sprint 7)._
 - [ ] Los usuarios registrados antes de esta historia también reciben las categorías por defecto (migración de datos)
 - [ ] Las categorías por defecto se pueden renombrar o archivar
 

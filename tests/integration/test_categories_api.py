@@ -51,7 +51,7 @@ def test_first_get_creates_defaults_once_and_per_user(
     second = client.get("/categories", headers=ana).json()
     other = client.get("/categories", headers=beto).json()
 
-    assert len(first) == 13
+    assert len(first) == 14
     assert {c["kind"] for c in first if c["name"] == "Otros"} == {"INCOME", "EXPENSE"}
     assert second == first
     assert not {c["id"] for c in other} & {c["id"] for c in first}
@@ -70,7 +70,7 @@ async def test_simultaneous_first_uses_do_not_duplicate(
             await uow.categories.add_defaults(default_categories(user_id))
             await uow.commit()
 
-    assert len(client.get("/categories", headers=auth).json()) == 13
+    assert len(client.get("/categories", headers=auth).json()) == 14
 
 
 def test_categories_require_a_token(client: TestClient) -> None:
