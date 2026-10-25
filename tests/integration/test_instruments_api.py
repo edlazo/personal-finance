@@ -59,3 +59,35 @@ def test_each_user_has_a_catalog_with_unique_tickers_per_market(
     assert [(i["market"], i["ticker"]) for i in listed] == [("BYMA", "AL30"), ("NYSE", "SPY")]
     assert create(client, ana, market="LSE").status_code == 422
     assert create(client, {}).status_code == 401
+
+
+def test_trades_move_the_broker_account_and_respect_the_holding(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    broker = client.post(
+        "/accounts",
+        headers=auth,
+        json={"name": "IOL", "type": "BROKER", "currency": "ARS", "initial_balance": "100000"},
+    ).json()["id"]
+    ggal = create(client, auth, ticker="GGAL", name="Galicia", type="STOCK").json()["id"]
+
+    def trade(side: str, quantity: str, price: str, fee: str = "0") -> Response:
+        body = {"account_id": broker, "instrument_id": ggal, "side": side, "quantity": quantity}
+        body |= {"price": price, "fee": fee, "date": "2026-10-24"}
+        return client.post("/trades", headers=auth, json=body)
+
+    bought = trade("BUY", "10", "6500", fee="100")
+    sold = trade("SELL", "4", "7000", fee="50")
+    too_many = trade("SELL", "7", "7000")
+    balance = client.get(f"/accounts/{broker}", headers=auth).json()["balance"]
+    movements = client.get("/transactions", headers=auth).json()["items"]
+
+    assert (bought.status_code, bought.json()["cash"]) == (201, "65100.00")
+    assert sold.json()["cash"] == "27950.00"
+    assert too_many.status_code == 422
+    assert balance == "62850.00"
+    assert {m["trade_id"] for m in movements} == {bought.json()["id"], sold.json()["id"]}
+    assert trade("BUY", "1", "1", fee="0").status_code == 201
+    other_user = client.post("/trades", headers=sign_up(), json={**bought.json(), "fee": "0"})
+    assert other_user.status_code == 404
