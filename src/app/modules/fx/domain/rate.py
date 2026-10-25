@@ -49,6 +49,12 @@ class ExchangeRate:
             raise InvalidRateError("Solo las cotizaciones manuales tienen dueño")
 
 
+class ExchangeRateProvider(Protocol):
+    async def fetch(self) -> list[ExchangeRate]:
+        """Cotizaciones actuales de una fuente externa (`source=API`, sin dueño)."""
+        ...
+
+
 class ExchangeRateRepository(Protocol):
     """Las lecturas ven las cotizaciones de la API y las manuales del usuario actual."""
 

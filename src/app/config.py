@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     jwt_secret: SecretStr = Field(default=SecretStr(DEV_JWT_SECRET), min_length=32)
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    # Cotizaciones automáticas (PF-39): días hábiles cada 30 min en esas horas (sintaxis cron:
+    # "10-17" es de 10:00 a 17:30); sábados y domingos, una vez a la hora diaria.
+    dolarapi_url: str = "https://dolarapi.com/v1/dolares"
+    fx_timezone: str = "America/Argentina/Buenos_Aires"
+    fx_business_hours: str = "10-17"
+    fx_daily_hour: int = 12
 
     @model_validator(mode="after")
     def _require_real_secret_in_production(self) -> Self:
