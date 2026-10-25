@@ -14,7 +14,7 @@
 | **PF-E0** Setup & DevOps | Repositorio, CI/CD, Docker, Alembic, esqueleto hexagonal y observabilidad base. | 8 | 18 |
 | **PF-E1** Identity | Registro, login JWT, refresh, perfil y preferencias. Aislamiento multiusuario. | 5 | 12 |
 | **PF-E2** Cuentas | Cuentas en ARS/USD (caja de ahorro, efectivo, billetera, comitente, wallet cripto) con saldo derivado. | 3 | 9 |
-| **PF-E3** Movimientos | Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD). | 7 | 19 |
+| **PF-E3** Movimientos | Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD). | 9 | 23 |
 | **PF-E4** Cotizaciones | Cotizaciones MEP/oficial/blue/CCL/cripto automáticas y manuales; conversión ARS<->USD. | 5 | 15 |
 | **PF-E5** Inversiones | Instrumentos (acciones, CEDEARs, bonos, ETFs, ONs, cripto), operaciones, posiciones y P&L. | 5 | 19 |
 | **PF-E6** Integraciones de mercado | Precios desde IOL, data912 y CoinGecko; importación de Balanz. | 6 | 20 |
@@ -276,6 +276,26 @@ _Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD)._
 - [ ] Transferencia entre monedas distintas requiere monto origen y monto destino (o tipo de cambio aplicado)
 - [ ] Se guarda el tipo de cambio efectivo de la operación
 - [ ] Comisión opcional registrada como gasto en categoría 'Comisiones'
+
+### US-062 - Gastos y transferencias sin saldo negativo
+`Story` | **3 SP** | Prioridad **Medium** | Sin sprint | label `ledger` | agregada en la Review del Sprint 5
+
+**Como** usuario, **quiero** que un gasto o una transferencia no deje en negativo una cuenta que no lo admite, **para** que mis saldos sean reales.
+
+**Criterios de aceptación**
+- [ ] Registrar o editar un gasto, o una transferencia, que deja el saldo por debajo de cero responde 422, salvo en cuentas comitentes (BROKER)
+- [ ] El saldo se evalúa a la fecha del movimiento y hacia adelante
+- [ ] Borrar un ingreso que deja la cuenta en negativo también responde 422
+
+### US-063 - Filtro por tipo de movimiento sin transferencias
+`Story` | **1 SP** | Prioridad **Low** | Sin sprint | label `ledger` | agregada en la Review del Sprint 5
+
+**Como** usuario, **quiero** que al filtrar por ingresos o gastos no aparezcan las transferencias, **para** ver solo lo que gané o gasté.
+
+**Criterios de aceptación**
+- [ ] `GET /transactions?kind=INCOME|EXPENSE` excluye las patas de las transferencias
+- [ ] Un filtro nuevo permite listar solo las transferencias
+- [ ] Sin filtro de tipo, el listado sigue mostrando todo
 
 ## PF-E4 - Cotizaciones
 
