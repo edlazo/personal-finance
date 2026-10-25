@@ -1,9 +1,11 @@
 """Dobles en memoria para los casos de uso de cotizaciones."""
 
+from datetime import datetime
 from types import TracebackType
 from typing import Self
 
 from app.modules.fx.domain.rate import ExchangeRate
+from app.shared.domain.rates import RateType
 
 
 class InMemoryRates:
@@ -12,6 +14,15 @@ class InMemoryRates:
 
     async def add(self, rate: ExchangeRate) -> None:
         self.items.append(rate)
+
+    # shortcut: las consultas solo se usan contra Postgres (tests de integración).
+    async def latest(self) -> list[ExchangeRate]:
+        return list(self.items)
+
+    async def history(
+        self, rate_type: RateType | None, *, since: datetime | None, until: datetime | None
+    ) -> list[ExchangeRate]:
+        return list(self.items)
 
 
 class FakeFxUnitOfWork:

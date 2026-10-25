@@ -5,7 +5,8 @@ from decimal import Decimal
 from typing import Self
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, Select, or_, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -56,6 +57,47 @@ class SqlAlchemyExchangeRateRepository:
             )
         )
         await self.session.flush()
+
+    def visible(self) -> Select[ExchangeRateModel]:
+        """Las de la API (sin dueño) y las manuales del usuario actual."""
+        m = ExchangeRateModel
+        return select(m).where(or_(m.user_id.is_(None), m.user_id == self.user_id))
+
+    async def latest(self) -> list[ExchangeRate]:
+        m = ExchangeRateModel
+        # DISTINCT ON de Postgres: la primera fila de cada tipo según el orden.
+        query = (
+            self.visible()
+            .ext(distinct_on(m.type))
+            .order_by(m.type, m.quoted_at.desc(), m.created_at.desc())
+        )
+        return [_to_domain(model) for model in await self.session.scalars(query)]
+
+    async def history(
+        self, rate_type: RateType | None, *, since: datetime | None, until: datetime | None
+    ) -> list[ExchangeRate]:
+        m = ExchangeRateModel
+        query = self.visible().order_by(m.quoted_at.desc(), m.created_at.desc())
+        if rate_type is not None:
+            query = query.where(m.type == rate_type)
+        if since is not None:
+            query = query.where(m.quoted_at >= since)
+        if until is not None:
+            query = query.where(m.quoted_at <= until)
+        return [_to_domain(model) for model in await self.session.scalars(query)]
+
+
+def _to_domain(model: ExchangeRateModel) -> ExchangeRate:
+    return ExchangeRate(
+        type=model.type,
+        buy=model.buy,
+        sell=model.sell,
+        quoted_at=model.quoted_at,
+        source=model.source,
+        user_id=model.user_id,
+        id=model.id,
+        created_at=model.created_at,
+    )
 
 
 class SqlAlchemyFxUnitOfWork(SqlAlchemyUnitOfWork):
