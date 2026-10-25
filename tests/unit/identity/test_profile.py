@@ -2,7 +2,11 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.identity.application.profile import GetProfile, UpdatePreferences
+from app.modules.identity.application.profile import (
+    GetProfile,
+    UpdatePreferences,
+    UserRatePreference,
+)
 from app.modules.identity.domain.user import User
 from app.shared.domain.auth import InvalidTokenError
 from app.shared.domain.rates import RateType
@@ -34,6 +38,7 @@ async def test_update_preferences_saves_the_new_rate(uow: FakeUnitOfWork, user: 
     assert updated.default_rate_type is RateType.BLUE
     assert uow.users.by_email[user.email].default_rate_type is RateType.BLUE
     assert uow.committed
+    assert await UserRatePreference(uow=uow).default_rate_type(user.id) is RateType.BLUE
 
 
 async def test_a_deleted_user_needs_to_log_in_again(uow: FakeUnitOfWork) -> None:

@@ -37,3 +37,13 @@ class UpdatePreferences:
             await self.uow.users.save_preferences(user)
             await self.uow.commit()
         return user
+
+
+@dataclass(frozen=True)
+class UserRatePreference:
+    """Implementa `RatePreference` (app.shared) para los otros módulos."""
+
+    uow: IdentityUnitOfWork
+
+    async def default_rate_type(self, user_id: UUID) -> RateType:
+        return (await GetProfile(uow=self.uow)(user_id)).default_rate_type
