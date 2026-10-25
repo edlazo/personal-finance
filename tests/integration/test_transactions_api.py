@@ -1,14 +1,20 @@
 from collections.abc import Callable, Iterator
+from datetime import date
+from decimal import Decimal
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from pydantic import PostgresDsn
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.config import Settings
 from app.main import create_app
+from app.modules.ledger.infrastructure.cash_movements import LedgerCashMovements
+from app.shared.domain.errors import NotFoundError
+from app.shared.infrastructure.database import create_session_factory
 
 pytestmark = pytest.mark.integration
 
@@ -236,3 +242,43 @@ def test_buying_dollars_with_a_fee(
     assert missing.status_code == 422
     assert edited.json()["amount"] == "99.50"
     assert balances == {"Galicia": "-125500.00", "Dólares": "99.50"}
+
+
+async def test_other_modules_move_cash_through_ledger(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    auth = sign_up()
+    user_id = UUID(client.get("/me", headers=auth).json()["id"])
+    broker = client.post(
+        "/accounts", headers=auth, json={"name": "IOL", "type": "BROKER", "currency": "ARS"}
+    ).json()["id"]
+    trade_id = uuid4()
+
+    async with create_session_factory(engine)() as session:
+        cash = LedgerCashMovements(session, user_id)
+        account = await cash.account(UUID(broker))
+        await cash.record_trade(
+            account.id,
+            Decimal("1500.00"),
+            incoming=False,
+            on=date(2026, 10, 24),
+            trade_id=trade_id,
+            description="Compra 10 GGAL",
+        )
+        await session.commit()
+        with pytest.raises(NotFoundError):
+            await LedgerCashMovements(session, uuid4()).account(UUID(broker))
+
+    [movement] = client.get("/transactions", headers=auth).json()["items"]
+    balance = client.get(f"/accounts/{broker}", headers=auth).json()["balance"]
+    assert (account.holds_investments, account.archived) == (True, False)
+    assert (movement["trade_id"], movement["category_id"], balance) == (
+        str(trade_id),
+        None,
+        "-1500.00",
+    )
+    patch = client.patch(f"/transactions/{movement['id']}", headers=auth, json={"amount": "1.00"})
+    assert (
+        patch.status_code,
+        client.delete(f"/transactions/{movement['id']}", headers=auth).status_code,
+    ) == (422, 422)
