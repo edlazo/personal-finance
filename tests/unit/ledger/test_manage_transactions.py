@@ -96,3 +96,26 @@ async def test_movements_of_an_archived_account_are_read_only(uow: FakeLedgerUni
         await UpdateTransaction(uow=uow)(movement.id, amount=Decimal("1.00"))
     with pytest.raises(AccountArchivedError):
         await DeleteTransaction(uow=uow)(movement.id)
+
+
+async def test_in_a_dollar_purchase_only_the_edited_leg_changes_its_amount(
+    uow: FakeLedgerUnitOfWork,
+) -> None:
+    pesos = account(uow)
+    dolares = Account(USER, "Dólares", AccountType.SAVINGS, Currency.USD, Decimal("0"))
+    uow.accounts.items[dolares.id] = dolares
+    bought = await CreateTransfer(uow=uow)(
+        USER,
+        source_id=pesos.id,
+        target_id=dolares.id,
+        amount=Decimal("125000"),
+        on=DAY,
+        received=Decimal("100"),
+    )
+
+    await UpdateTransaction(uow=uow)(bought.incoming.id, amount=Decimal("99"), on=date(2026, 10, 1))
+
+    assert {(t.amount, t.date) for t in uow.transactions.items} == {
+        (Decimal("125000"), date(2026, 10, 1)),
+        (Decimal("99"), date(2026, 10, 1)),
+    }

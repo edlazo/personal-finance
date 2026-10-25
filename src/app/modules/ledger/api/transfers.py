@@ -1,6 +1,7 @@
 """Endpoint de transferencias entre cuentas propias."""
 
 import datetime as dt
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, status
@@ -18,12 +19,19 @@ class CreateTransferRequest(BaseModel):
     amount: Amount
     date: dt.date
     description: Description = None
+    # Compra o venta de dólares: lo que entra a la cuenta destino, en su moneda.
+    to_amount: Amount | None = None
+    # Opcional: gasto aparte en la cuenta origen, en la categoría "Comisiones".
+    fee: Amount | None = None
 
 
 class TransferResponse(BaseModel):
     transfer_group_id: UUID
     outgoing: TransactionResponse
     incoming: TransactionResponse
+    # Pesos por dólar de la operación; solo entre monedas distintas.
+    exchange_rate: Decimal | None
+    fee: TransactionResponse | None
 
 
 router = APIRouter(
@@ -40,7 +48,10 @@ router = APIRouter(
     "",
     status_code=status.HTTP_201_CREATED,
     summary="Transferir entre mis cuentas",
-    description="Cuentas distintas, de la misma moneda y no archivadas. No es ingreso ni gasto.",
+    description=(
+        "Cuentas distintas, propias y no archivadas; no es ingreso ni gasto. Entre ARS y USD "
+        "(compra o venta de dólares) hace falta `to_amount` y se devuelve el tipo de cambio."
+    ),
 )
 async def create_transfer(
     body: CreateTransferRequest, user_id: CurrentUserId, uow: LedgerUow
@@ -52,9 +63,13 @@ async def create_transfer(
         amount=body.amount,
         on=body.date,
         description=body.description,
+        received=body.to_amount,
+        fee=body.fee,
     )
     return TransferResponse(
         transfer_group_id=result.group_id,
         outgoing=TransactionResponse.model_validate(result.outgoing),
         incoming=TransactionResponse.model_validate(result.incoming),
+        exchange_rate=result.exchange_rate,
+        fee=None if result.fee is None else TransactionResponse.model_validate(result.fee),
     )

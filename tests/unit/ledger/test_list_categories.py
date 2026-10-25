@@ -14,7 +14,7 @@ async def test_first_use_creates_the_default_categories_once() -> None:
     first = await list_categories(user_id)
     second = await list_categories(user_id)
 
-    assert Counter(c.kind for c in first) == {CategoryKind.EXPENSE: 9, CategoryKind.INCOME: 4}
+    assert Counter(c.kind for c in first) == {CategoryKind.EXPENSE: 10, CategoryKind.INCOME: 4}
     assert {c.name for c in first if c.kind is CategoryKind.INCOME} == {
         "Sueldo",
         "Freelance",
