@@ -50,4 +50,16 @@ class ExchangeRate:
 
 
 class ExchangeRateRepository(Protocol):
+    """Las lecturas ven las cotizaciones de la API y las manuales del usuario actual."""
+
     async def add(self, rate: ExchangeRate) -> None: ...
+
+    async def latest(self) -> list[ExchangeRate]:
+        """La más reciente de cada tipo, ordenadas por tipo."""
+        ...
+
+    async def history(
+        self, rate_type: RateType | None, *, since: datetime | None, until: datetime | None
+    ) -> list[ExchangeRate]:
+        """De la más reciente a la más vieja; `since` y `until` inclusive."""
+        ...
