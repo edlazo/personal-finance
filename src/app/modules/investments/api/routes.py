@@ -5,10 +5,11 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.investments.application.list_positions import ListPositions
 from app.modules.investments.application.manage_instruments import (
     CreateInstrument,
     ListInstruments,
@@ -18,8 +19,10 @@ from app.modules.investments.domain.instrument import InstrumentType, Market
 from app.modules.investments.domain.trade import TradeSide
 from app.modules.investments.infrastructure.persistence import SqlAlchemyInvestmentsUnitOfWork
 from app.shared.api.auth import CurrentUserId
+from app.shared.api.contracts import Converter, Preference
 from app.shared.api.dependencies import get_session_factory
 from app.shared.domain.money import Currency
+from app.shared.domain.rates import RateType
 
 
 class CreateInstrumentRequest(BaseModel):
@@ -148,3 +151,71 @@ async def create_trade(
         on=body.date,
     )
     return TradeResponse(**vars(trade) | {"cash": cash})
+
+
+class PositionResponse(BaseModel):
+    account_id: UUID
+    instrument: InstrumentResponse
+    quantity: Decimal
+    # Precios por unidad (cada 100 VN en bonos y ONs), en la moneda del instrumento.
+    average_price: Decimal
+    current_price: Decimal
+    # Hasta la carga de precios (Sprint 8) es el de la última operación.
+    price_source: str = "LAST_TRADE"
+    cost: Decimal
+    valuation: Decimal
+    unrealized_pnl: Decimal
+    unrealized_pnl_pct: Decimal
+    realized_pnl: Decimal
+    valuation_ars: Decimal
+    valuation_usd: Decimal
+
+
+class PositionsResponse(BaseModel):
+    rate_type: RateType
+    positions: list[PositionResponse]
+
+
+positions_router = APIRouter(
+    prefix="/positions",
+    tags=["inversiones"],
+    responses={status.HTTP_401_UNAUTHORIZED: {"description": "Token inválido o vencido"}},
+)
+
+
+@positions_router.get(
+    "",
+    summary="Mis posiciones y resultados",
+    description=(
+        "Por cuenta e instrumento, con costo promedio ponderado (comisiones incluidas). Las "
+        "posiciones cerradas quedan con cantidad 0 y su P&L realizado."
+    ),
+)
+async def list_positions(
+    user_id: CurrentUserId,
+    uow: InvestmentsUow,
+    converter: Converter,
+    preference: Preference,
+    rate_type: Annotated[RateType | None, Query(description="Sin valor: mi preferida")] = None,
+) -> PositionsResponse:
+    used, valued = await ListPositions(uow, converter, preference)(user_id, rate_type=rate_type)
+    positions = []
+    for v in valued:
+        p = v.position
+        positions.append(
+            PositionResponse(
+                account_id=p.account_id,
+                instrument=InstrumentResponse.model_validate(p.instrument),
+                quantity=p.quantity,
+                average_price=p.average_price,
+                current_price=p.current_price,
+                cost=p.cost,
+                valuation=p.valuation,
+                unrealized_pnl=p.unrealized_pnl,
+                unrealized_pnl_pct=p.unrealized_pnl_pct,
+                realized_pnl=p.realized_pnl,
+                valuation_ars=v.valuation_ars,
+                valuation_usd=v.valuation_usd,
+            )
+        )
+    return PositionsResponse(rate_type=used, positions=positions)
