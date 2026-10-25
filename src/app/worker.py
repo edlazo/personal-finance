@@ -8,6 +8,8 @@ import httpx2
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+# fx_rates.user_id apunta a users: sin esta tabla en la metadata, guardar una cotización falla.
+import app.modules.identity.infrastructure.models  # noqa: F401
 from app.config import get_settings
 from app.modules.fx.infrastructure.dolarapi import DolarApiProvider
 from app.modules.fx.infrastructure.jobs import schedule_fx_jobs
