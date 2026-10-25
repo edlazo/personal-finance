@@ -141,3 +141,32 @@ def test_list_filters_paginates_and_sorts_newest_first(
     assert ids(q="100%", account_id=account_id) == [pay.json()["id"]]
     assert ids(q="_") == []
     assert client.get("/transactions", headers=sign_up()).json()["total"] == 0
+
+
+def test_transfer_moves_money_between_own_accounts(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    galicia, _ = setup(client, auth)
+    caja = client.post(
+        "/accounts", headers=auth, json={"name": "Caja", "type": "CASH", "currency": "ARS"}
+    ).json()["id"]
+    usd = client.post(
+        "/accounts", headers=auth, json={"name": "Dólares", "type": "CASH", "currency": "USD"}
+    ).json()["id"]
+
+    def send(source: str, target: str, headers: dict[str, str] = auth) -> Response:
+        body = {"from_account_id": source, "to_account_id": target, "amount": "300.00"}
+        return client.post("/transfers", headers=headers, json=body | {"date": "2026-10-24"})
+
+    created = send(galicia, caja)
+    balances = {a["name"]: a["balance"] for a in client.get("/accounts", headers=auth).json()}
+    listed = client.get("/transactions", headers=auth).json()["items"]
+
+    assert created.status_code == 201
+    group = created.json()["transfer_group_id"]
+    assert balances == {"Galicia": "-300.00", "Caja": "300.00", "Dólares": "0.00"}
+    assert [(t["category_id"], t["transfer_group_id"]) for t in listed] == [(None, group)] * 2
+    assert send(galicia, galicia).status_code == 422
+    assert send(galicia, usd).status_code == 422
+    assert send(galicia, caja, headers=sign_up()).status_code == 404

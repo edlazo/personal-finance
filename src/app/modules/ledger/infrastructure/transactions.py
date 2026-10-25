@@ -4,7 +4,18 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Index, Numeric, String, func, select
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    func,
+    select,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.modules.ledger.domain.category import CategoryKind
@@ -16,10 +27,17 @@ from app.shared.infrastructure.user_scoped import UserOwnedMixin, UserScopedRepo
 class TransactionModel(UserOwnedMixin, Base):
     __tablename__ = "transactions"
     # El listado (PF-34) filtra por usuario y ordena por fecha.
-    __table_args__ = (Index("ix_transactions_user_id_date", "user_id", "date"),)
+    __table_args__ = (
+        Index("ix_transactions_user_id_date", "user_id", "date"),
+        # Con categoría (ingreso o gasto) o pata de una transferencia, nunca ambas.
+        CheckConstraint(
+            "(category_id IS NULL) <> (transfer_group_id IS NULL)", name="category_or_transfer"
+        ),
+    )
 
     account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.id"), index=True)
-    category_id: Mapped[UUID] = mapped_column(ForeignKey("categories.id"), index=True)
+    category_id: Mapped[UUID | None] = mapped_column(ForeignKey("categories.id"), index=True)
+    transfer_group_id: Mapped[UUID | None] = mapped_column(index=True)
     kind: Mapped[CategoryKind] = mapped_column(
         Enum(CategoryKind, name="transaction_kind", native_enum=False, length=10)
     )
@@ -43,6 +61,7 @@ class SqlAlchemyTransactionRepository(UserScopedRepository[TransactionModel]):
                 amount=transaction.amount,
                 date=transaction.date,
                 description=transaction.description,
+                transfer_group_id=transaction.transfer_group_id,
                 created_at=transaction.created_at,
             )
         )
@@ -86,5 +105,6 @@ def _to_domain(model: TransactionModel) -> Transaction:
         date=model.date,
         category_id=model.category_id,
         description=model.description,
+        transfer_group_id=model.transfer_group_id,
         created_at=model.created_at,
     )
