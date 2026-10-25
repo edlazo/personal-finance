@@ -8,7 +8,7 @@
 | **Developer** | Claude (con revisión del PO) | Diseña, implementa, testea y documenta los incrementos según la DoD. |
 
 ## Cadencia
-- **Sprint:** 2 semanas.
+- **Sprint:** 2 semanas, planificado por objetivo: se compromete según la velocity y, si el Sprint Goal se cumple antes, se hacen la Review y la Retro y se planifica el siguiente (decisión del PO en el cierre del Sprint 4).
 - **Dedicación:** unas 10 h/semana, o sea unas 20 h por sprint.
 - **Ceremonias:** unas 3 h por sprint, así que quedan **unas 17 h netas de desarrollo**.
 
@@ -46,7 +46,7 @@ Una historia puede entrar a un sprint si:
 Una historia está terminada cuando:
 - [ ] El código está en `feature/PF-<n>-<slug>` y mergeado a `develop` vía PR (squash).
 - [ ] El título del PR es un Conventional Commit con la key de Jira, por ejemplo `feat(accounts): crear cuenta [PF-14]`.
-- [ ] El CI está en verde: ruff, ruff format, mypy `--strict`, import-linter, pytest con cobertura ≥ 85 %, `alembic check` y commitlint.
+- [ ] El CI está en verde: ruff, ruff format, mypy `--strict`, import-linter, pytest con cobertura ≥ 85 %, `alembic check` y prefijo de commits.
 - [ ] Sin `DeprecationWarning`: pytest falla si aparece alguno.
 - [ ] Hay tests unitarios de dominio y tests de integración/e2e del endpoint.
 - [ ] Incluye la migración de Alembic, si cambia el esquema.

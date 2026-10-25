@@ -2,7 +2,7 @@
 
 Backend para gestionar finanzas personales: **activos, ingresos, gastos, inversiones, tarjetas y deudas**, con vista consolidada siempre disponible en **ARS y USD** (MEP, oficial, blue, CCL, cripto).
 
-> Estado: **Sprint 0, definición.** Todavía no hay código de producto. Ver el [roadmap](docs/scrum/roadmap.md).
+> Estado: **Sprint 1, base técnica.** Ver el [roadmap](docs/scrum/roadmap.md).
 
 ## Funcionalidades (v1.0)
 - Multiusuario con autenticación JWT.
@@ -20,9 +20,9 @@ Detalle y justificación en [docs/stack.md](docs/stack.md).
 
 ## Entorno local
 ```powershell
-# 1. Python 3.14.8
-winget install Python.Python.3.14
-py -3.14 --version          # Python 3.14.8
+# 1. Python 3.14.8 (instalador de python.org; winget puede instalar otro patch)
+#    https://www.python.org/downloads/release/python-3148/
+py -3.14 --version          # debe decir Python 3.14.8
 
 # 2. Entorno virtual + dependencias
 py -3.14 -m venv .venv
@@ -32,9 +32,49 @@ pip install -r requirements-dev.txt
 pip check
 
 # 3. Hooks de git
-pre-commit install --hook-type pre-commit --hook-type commit-msg
+pre-commit install          # pre-commit, commit-msg y pre-push (con el venv activado)
 ```
-Las instrucciones para levantar la base de datos y la API (`docker compose up`, `fastapi dev`) se agregan en el Sprint 1.
+
+### Levantar todo con Docker
+```powershell
+docker compose up -d --build --wait   # db, migraciones, api y worker
+curl http://localhost:8000/health     # {"status":"ok","checks":{"database":"ok"}}
+docker compose down                   # los datos quedan en el volumen pgdata (-v para borrarlos)
+```
+
+### Desarrollar la API con recarga automática
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --wait db
+alembic upgrade head
+fastapi dev src/app/main.py   # http://127.0.0.1:8000/health y /docs
+python -m app.worker          # worker de jobs (con PYTHONPATH=src)
+```
+
+### Frontend
+```powershell
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+npm run lint ; npm run format:check ; npm run typecheck ; npm test
+```
+React + Vite + TypeScript, Tailwind CSS 4, shadcn/ui; lint con oxlint y formato con Prettier.
+
+### Migraciones
+```powershell
+alembic revision --autogenerate -m "crear tabla x"   # se formatea con ruff automáticamente
+alembic upgrade head
+alembic check                                        # falla si los modelos no coinciden con las migraciones
+```
+
+### Chequeos de calidad
+```powershell
+ruff check . ; ruff format --check .
+mypy
+$env:PYTHONPATH = "src"; lint-imports
+pytest -m "not integration"   # unitarios, sin Docker
+pytest --cov                  # todos; los de integración levantan Postgres con testcontainers
+```
 
 ## Forma de trabajo
 - **Scrum**: sprints de 2 semanas gestionados en Jira (proyecto `PF`). Ver el [working agreement](docs/scrum/working-agreement.md).

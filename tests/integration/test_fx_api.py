@@ -1,0 +1,166 @@
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from typing import Any
+from uuid import UUID, uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+from httpx2 import Response
+from pydantic import PostgresDsn
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from app.config import Settings
+from app.main import create_app
+from app.modules.fx.application.currency_converter import CurrencyConverter
+from app.modules.fx.domain.rate import ExchangeRate, RateSource
+from app.modules.fx.infrastructure.jobs import sync_rates
+from app.modules.fx.infrastructure.persistence import ExchangeRateModel, SqlAlchemyFxUnitOfWork
+from app.shared.domain.money import Currency
+from app.shared.domain.rates import RateType
+from app.shared.infrastructure.database import create_session_factory
+
+pytestmark = pytest.mark.integration
+
+PASSWORD = "clave-larga-123"
+
+
+@pytest.fixture
+def client(migrated_database_url: str) -> Iterator[TestClient]:
+    settings = Settings(
+        _env_file=None, environment="test", database_url=PostgresDsn(migrated_database_url)
+    )
+    with TestClient(create_app(settings)) as client:
+        yield client
+
+
+@pytest.fixture
+def sign_up(client: TestClient) -> Callable[[], dict[str, str]]:
+    def create() -> dict[str, str]:
+        email = f"cotizaciones-{uuid4().hex[:8]}@example.com"
+        client.post("/auth/register", json={"email": email, "password": PASSWORD, "name": "Ana"})
+        login = client.post("/auth/login", json={"email": email, "password": PASSWORD})
+        return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    return create
+
+
+def post_rate(client: TestClient, auth: dict[str, str], **fields: Any) -> Response:
+    body = {
+        "type": "MEP",
+        "buy": "1180.5",
+        "sell": "1200.1234567891",
+        "quoted_at": "2026-10-24T15:00:00-03:00",
+    }
+    return client.post("/fx/rates", headers=auth, json=body | fields)
+
+
+async def test_manual_rates_are_stored_without_overwriting(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    auth = sign_up()
+
+    first = post_rate(client, auth)
+    second = post_rate(client, auth, sell="1210")
+
+    assert first.status_code == second.status_code == 201
+    assert (first.json()["sell"], first.json()["source"]) == ("1200.1234567891", "MANUAL")
+    ids = [first.json()["id"], second.json()["id"]]
+    async with engine.connect() as connection:
+        count = select(func.count()).where(ExchangeRateModel.id.in_(ids))
+        assert await connection.scalar(count) == 2
+
+
+def test_invalid_or_anonymous_rates_are_rejected(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+
+    assert post_rate(client, {}).status_code == 401
+    assert post_rate(client, auth, buy="0").status_code == 422
+    assert post_rate(client, auth, quoted_at="2026-10-24T15:00:00").status_code == 422
+    assert post_rate(client, auth, type="EURO").status_code == 422
+
+
+async def test_latest_and_history_show_api_rates_and_only_my_manual_ones(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    ana, beto = sign_up(), sign_up()
+    # Fechas desde ahora: la base de los tests se comparte y puede tener otras cotizaciones.
+    base = datetime.now(UTC) + timedelta(days=1)
+    later, earlier = base + timedelta(hours=1), base
+    newest = post_rate(client, ana, sell="1300", quoted_at=later.isoformat()).json()
+    older = post_rate(client, ana, sell="1250", quoted_at=earlier.isoformat()).json()
+    post_rate(client, beto, sell="9999", quoted_at=(later + timedelta(hours=1)).isoformat())
+    api = ExchangeRate(RateType.CCL, Decimal("1290"), Decimal("1310"), later, RateSource.API)
+    async with SqlAlchemyFxUnitOfWork(create_session_factory(engine), uuid4()) as uow:
+        await uow.rates.add(api)
+        await uow.commit()
+
+    latest = {r["type"]: r for r in client.get("/fx/rates/latest", headers=ana).json()}
+    history = client.get("/fx/rates", headers=ana, params={"type": "MEP"}).json()
+    window = {"type": "MEP", "from": earlier.isoformat(), "to": earlier.isoformat()}
+    only_earlier = client.get("/fx/rates", headers=ana, params=window).json()
+
+    assert (latest["MEP"]["id"], latest["CCL"]["id"]) == (newest["id"], str(api.id))
+    assert [r["id"] for r in history][:2] == [newest["id"], older["id"]]
+    assert [r["id"] for r in only_earlier] == [older["id"]]
+    assert "9999" not in {r["sell"] for r in history}
+    everything = client.get("/fx/rates", headers=ana).json()
+    assert {newest["id"], str(api.id)} <= {r["id"] for r in everything}
+    assert client.get("/fx/rates", headers=ana, params={"from": "2026-10-24"}).status_code == 422
+
+
+class FixedProvider:
+    def __init__(self, *rates: ExchangeRate) -> None:
+        self.rates = list(rates)
+
+    async def fetch(self) -> list[ExchangeRate]:
+        return self.rates
+
+
+async def test_the_worker_job_stores_api_rates_once_for_everyone(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    # CRIPTO y fecha actual: no pisa la "última" que miran los otros tests de la base compartida.
+    rate = ExchangeRate(
+        RateType.CRIPTO, Decimal("1500"), Decimal("1520"), datetime.now(UTC), RateSource.API
+    )
+    provider = FixedProvider(rate)
+
+    await sync_rates(create_session_factory(engine), provider)
+    await sync_rates(create_session_factory(engine), provider)
+
+    latest = {r["type"]: r for r in client.get("/fx/rates/latest", headers=sign_up()).json()}
+    assert (latest["CRIPTO"]["id"], latest["CRIPTO"]["source"]) == (str(rate.id), "API")
+    async with engine.connect() as connection:
+        same_quote = select(func.count()).where(
+            ExchangeRateModel.type == RateType.CRIPTO,
+            ExchangeRateModel.quoted_at == rate.quoted_at,
+        )
+        assert await connection.scalar(same_quote) == 1
+
+
+async def test_the_converter_uses_my_rates_and_never_a_later_one(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    ana, beto = sign_up(), sign_up()
+    ana_id = client.get("/me", headers=ana).json()["id"]
+    # 2020: ninguna otra prueba carga BLUE en esas fechas en la base compartida.
+    post_rate(client, ana, type="BLUE", buy="80", sell="81", quoted_at="2020-01-02T12:00:00Z")
+    post_rate(client, ana, type="BLUE", buy="90", sell="91", quoted_at="2020-01-09T12:00:00Z")
+    post_rate(client, beto, type="BLUE", buy="99", sell="99", quoted_at="2020-01-05T12:00:00Z")
+    converter = CurrencyConverter(
+        uow=SqlAlchemyFxUnitOfWork(create_session_factory(engine), UUID(ana_id))
+    )
+
+    converted = await converter.convert(
+        Decimal("10"),
+        Currency.USD,
+        Currency.ARS,
+        rate_type=RateType.BLUE,
+        at=datetime(2020, 1, 6, tzinfo=UTC),
+    )
+
+    assert converted == Decimal("800.00")

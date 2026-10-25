@@ -14,7 +14,7 @@
 | **PF-E0** Setup & DevOps | Repositorio, CI/CD, Docker, Alembic, esqueleto hexagonal y observabilidad base. | 8 | 18 |
 | **PF-E1** Identity | Registro, login JWT, refresh, perfil y preferencias. Aislamiento multiusuario. | 5 | 12 |
 | **PF-E2** Cuentas | Cuentas en ARS/USD (caja de ahorro, efectivo, billetera, comitente, wallet cripto) con saldo derivado. | 3 | 9 |
-| **PF-E3** Movimientos | Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD). | 7 | 19 |
+| **PF-E3** Movimientos | Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD). | 9 | 23 |
 | **PF-E4** Cotizaciones | Cotizaciones MEP/oficial/blue/CCL/cripto automáticas y manuales; conversión ARS<->USD. | 5 | 15 |
 | **PF-E5** Inversiones | Instrumentos (acciones, CEDEARs, bonos, ETFs, ONs, cripto), operaciones, posiciones y P&L. | 5 | 19 |
 | **PF-E6** Integraciones de mercado | Precios desde IOL, data912 y CoinGecko; importación de Balanz. | 6 | 20 |
@@ -23,6 +23,7 @@
 | **PF-E9** Planificación | Movimientos recurrentes y presupuestos mensuales por categoría. | 4 | 12 |
 | **PF-E10** Reportes | Patrimonio neto, flujo de fondos, gastos por categoría y evolución histórica. | 5 | 17 |
 | **PF-E11** Bienes (futuro) | Inmuebles y vehículos con valuación manual incluidos en el patrimonio. | 2 | 8 |
+| **PF-E12** Frontend | SPA React + Vite + TS en `frontend/`: dashboard con datos mock tipados (agregada en la Review del Sprint 1). | 5 | 19 |
 
 ## PF-E0 - Setup & DevOps
 
@@ -37,7 +38,7 @@ _Repositorio, CI/CD, Docker, Alembic, esqueleto hexagonal y observabilidad base.
 - [ ] Existe `src/app` con `shared/` y `modules/` siguiendo domain/application/infrastructure/api
 - [ ] `Settings` (pydantic-settings) lee variables desde entorno y `.env`; existe `.env.example`
 - [ ] `create_app()` usa `lifespan` (no `on_event`)
-- [ ] `GET /health` responde 200 con estado de la app y de la base de datos
+- [ ] `GET /health` responde 200 con el estado de la app (el chequeo de la base de datos pasa a US-003)
 - [ ] `pyproject.toml` configura ruff, mypy strict, pytest (`error::DeprecationWarning`), coverage e import-linter
 
 ### US-002 - Docker y Docker Compose para desarrollo
@@ -60,6 +61,7 @@ _Repositorio, CI/CD, Docker, Alembic, esqueleto hexagonal y observabilidad base.
 - [ ] Alembic configurado con `DeclarativeBase` y convención de nombres de constraints
 - [ ] `alembic upgrade head` y `alembic check` funcionan en local y CI
 - [ ] UnitOfWork base implementado y testeado
+- [ ] `GET /health` incluye el chequeo de la base de datos en `checks.database` (viene de US-001)
 
 ### US-004 - Pipelines de CI y hooks locales: reglas de PR, prefijos, lint, tipos y tests
 `Task` | **3 SP** | Prioridad **Highest** | Sprint 1 | label `devops`
@@ -126,7 +128,7 @@ _Registro, login JWT, refresh, perfil y preferencias. Aislamiento multiusuario._
 - [ ] Dado un email no registrado y contraseña válida (>= 10 caracteres), cuando hago `POST /auth/register`, entonces se crea el usuario y responde 201 sin exponer el hash
 - [ ] Dado un email ya registrado, entonces responde 409
 - [ ] La contraseña se guarda con Argon2id (pwdlib)
-- [ ] Al registrarse se crean las categorías por defecto (ver US-014) y preferencia de cotización MEP
+- [ ] Al registrarse se crea la preferencia de cotización MEP (las categorías por defecto pasan a US-014; Planning del Sprint 3)
 
 ### US-007 - Login con JWT
 `Story` | **3 SP** | Prioridad **Highest** | Sprint 2 | label `identity`
@@ -213,6 +215,7 @@ _Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD)._
 
 **Criterios de aceptación**
 - [ ] Al registrarse se crean categorías de gasto (Supermercado, Servicios, Alquiler, Transporte, Salud, Ocio, Educación, Impuestos, Otros) e ingreso (Sueldo, Freelance, Rentas, Otros)
+- [ ] Los usuarios registrados antes de esta historia también reciben las categorías por defecto (migración de datos)
 - [ ] Las categorías por defecto se pueden renombrar o archivar
 
 ### US-015 - Gestionar categorías y subcategorias
@@ -274,6 +277,26 @@ _Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD)._
 - [ ] Se guarda el tipo de cambio efectivo de la operación
 - [ ] Comisión opcional registrada como gasto en categoría 'Comisiones'
 
+### US-062 - Gastos y transferencias sin saldo negativo
+`Story` | **3 SP** | Prioridad **Medium** | Sin sprint | label `ledger` | agregada en la Review del Sprint 5
+
+**Como** usuario, **quiero** que un gasto o una transferencia no deje en negativo una cuenta que no lo admite, **para** que mis saldos sean reales.
+
+**Criterios de aceptación**
+- [ ] Registrar o editar un gasto, o una transferencia, que deja el saldo por debajo de cero responde 422, salvo en cuentas comitentes (BROKER)
+- [ ] El saldo se evalúa a la fecha del movimiento y hacia adelante
+- [ ] Borrar un ingreso que deja la cuenta en negativo también responde 422
+
+### US-063 - Filtro por tipo de movimiento sin transferencias
+`Story` | **1 SP** | Prioridad **Low** | Sin sprint | label `ledger` | agregada en la Review del Sprint 5
+
+**Como** usuario, **quiero** que al filtrar por ingresos o gastos no aparezcan las transferencias, **para** ver solo lo que gané o gasté.
+
+**Criterios de aceptación**
+- [ ] `GET /transactions?kind=INCOME|EXPENSE` excluye las patas de las transferencias
+- [ ] Un filtro nuevo permite listar solo las transferencias
+- [ ] Sin filtro de tipo, el listado sigue mostrando todo
+
 ## PF-E4 - Cotizaciones
 
 _Cotizaciones MEP/oficial/blue/CCL/cripto automáticas y manuales; conversión ARS<->USD._
@@ -297,7 +320,7 @@ _Cotizaciones MEP/oficial/blue/CCL/cripto automáticas y manuales; conversión A
 - [ ] Puerto `ExchangeRateProvider` y adaptador `DolarApiProvider` (oficial, blue, bolsa=MEP, contadoconliqui, cripto)
 - [ ] Job del worker cada 30 min en días hábiles 10-18 h (configurable) y 1 vez al día el resto
 - [ ] Reintentos con tenacity; si falla se loguea y se conserva el último valor
-- [ ] Tests del adaptador con respx
+- [ ] Tests del adaptador con `httpx2.MockTransport`
 
 ### US-023 - Consultar cotizaciones
 `Story` | **2 SP** | Prioridad **High** | Sprint 5 | label `fx`
@@ -410,7 +433,7 @@ _Precios desde IOL, data912 y CoinGecko; importación de Balanz._
 
 **Criterios de aceptación**
 - [ ] Adaptador `CoinGeckoProvider` (puerto `PriceProvider`) para instrumentos CRYPTO
-- [ ] Job periodico; tests con respx
+- [ ] Job periodico; tests con `httpx2.MockTransport`
 
 ### US-033 - Precios desde IOL
 `Story` | **5 SP** | Prioridad **High** | Sprint 8 | label `integrations`
@@ -613,3 +636,41 @@ _Inmuebles y vehículos con valuación manual incluidos en el patrimonio._
 **Criterios de aceptación**
 - [ ] El reporte de patrimonio incluye bienes con su última valuación
 
+## PF-E12 - Frontend
+_Agregada el 2026-10-23 (Review del Sprint 1) a pedido del PO. Diseño de referencia: dashboard de tarjetas blancas sobre gris claro con acento verde._
+
+### US-057 - Esqueleto del frontend y CI
+`Task` | **3 SP** | Prioridad **Highest** | label `frontend` | Jira PF-76
+
+- [ ] `frontend/` con Vite + React + TypeScript strict, Tailwind CSS 4 y componentes shadcn/ui
+- [ ] ESLint + Prettier (check, sin autocorrección en CI) y Vitest + Testing Library
+- [ ] Job `frontend` en `quality.yml`: lint, typecheck, test y build
+- [ ] `pr-rules` excluye `frontend/package-lock.json` del límite de 400 líneas
+- [ ] Dependabot semanal para npm en `frontend/`
+
+### US-058 - Layout del dashboard
+`Story` | **3 SP** | Prioridad **High** | label `frontend` | Jira PF-77
+
+- [ ] Sidebar de íconos (Dashboard, Cuentas, Movimientos, Inversiones, Tarjetas, Reportes, Configuración, Salir) y header con saludo, búsqueda, notificaciones y avatar
+- [ ] Grilla de tarjetas responsive (3/2/1 columnas), accesible por teclado y con contraste AA
+
+### US-059 - Dashboard: KPIs, evolución del patrimonio y presupuesto
+`Story` | **5 SP** | Prioridad **High** | label `frontend` | Jira PF-78
+
+- [ ] KPIs: patrimonio neto, ingresos y gastos del mes, dólar MEP (destacada), con variación vs el mes anterior
+- [ ] Gráfico de evolución del patrimonio (12 meses, ARS/USD) y dona de presupuesto usado
+- [ ] Montos con `Intl.NumberFormat` es-AR; datos mock tipados con la forma de la API
+
+### US-060 - Dashboard: tarjetas, movimientos, seguridad, gastos e inversiones
+`Story` | **5 SP** | Prioridad **Medium** | label `frontend` | Jira PF-79
+
+- [ ] Perfil, tarjeta de crédito (disponible y próximo resumen), últimos 5 movimientos, seguridad (2FA y sesiones), gastos por categoría e inversiones (valor y P&L)
+- [ ] Datos mock tipados
+
+### US-061 - Login y registro en el frontend
+`Story` | **3 SP** | Prioridad **High** | label `frontend` | Jira PF-82 | Agregada en el Planning del Sprint 3
+
+- [ ] Pantallas de login y registro con validación y mensajes de error de la API (problem+json)
+- [ ] Tokens guardados de forma segura y renovados con el refresh; Salir hace logout
+- [ ] Sin sesión, el dashboard redirige al login
+- [ ] El header y el perfil usan `GET /me` en lugar del usuario de ejemplo
