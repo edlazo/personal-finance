@@ -33,7 +33,16 @@
 | A1 | En historias con módulo nuevo, planear desde el inicio dos PRs (dominio y casos de uso; base y API) | Dev | Permanente |
 | A2 | Cargar los checks requeridos en los rulesets de develop y main; `pre-commit install` y cerrar el PR #19 | PO | Antes del primer PR del Sprint 8 |
 | A3 | Antes de cada cierre, levantar la app completa (API, worker y frontend) contra Postgres y probar lo nuevo | Dev | Cierre de cada sprint |
-| A4 | Conseguir un archivo exportado de Balanz (anonimizado) y los datos de habilitación de la API de IOL para el spike PF-48 | PO | Antes de arrancar PF-48 |
+| A4 | Pedir a IOL la habilitación de la API para la cuenta del PO (ver el detalle abajo) | PO | Antes de arrancar PF-48 |
+
+### Detalle de la acción A4: por qué pedimos la API de IOL
+- **Para qué:** la app valúa la cartera con el precio de cada instrumento. Hoy ese precio se carga a mano (US-029); con la API, las acciones, CEDEARs, bonos y ONs de BYMA se actualizan solos (US-033).
+- **Qué se usa:** solo lectura de cotizaciones (y, si el spike lo confirma, del portafolio para comparar tenencias). La app no envía órdenes ni opera.
+- **Uso:** personal y no comercial, con la cuenta del propio PO y sin terceros.
+- **Seguridad:** las credenciales se guardan cifradas (US-032) y nunca se devuelven en ninguna respuesta.
+- **Frecuencia:** baja, del orden de cada 30 minutos en horario de mercado (unas 286 corridas por mes).
+- **Límite:** IOL permite 25.000 llamadas por mes y pasarlo se cobra. La app cuenta cada llamada y se frena sola al 80 % (20.000). Con una llamada por instrumento entran unos 68 instrumentos; si IOL trae varias cotizaciones por llamada, mucho menos uso.
+- **Decisión del PO:** Balanz queda fuera; solo se integra IOL.
 
 ## Seguimiento de las acciones del sprint anterior
 - [x] A1: build de la imagen en cada PR (PF-90).
