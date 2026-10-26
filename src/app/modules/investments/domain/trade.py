@@ -59,16 +59,20 @@ class Trade:
         return cash
 
 
-def check_trade(
-    trade: Trade, account: CashAccount, instrument: Instrument, holding: Decimal
-) -> None:
-    """Decisiones del PO: misma moneda que el instrumento y tenencia por cuenta."""
+def check_account(account: CashAccount, instrument: Instrument) -> None:
     if not account.holds_investments:
         raise InvalidTradeError("Se opera desde una cuenta comitente o una wallet cripto")
     if account.archived:
         raise InvalidTradeError("No se pueden cargar operaciones en una cuenta archivada")
     if account.currency is not instrument.currency:
         raise InvalidTradeError("La cuenta tiene que estar en la moneda del instrumento")
+
+
+def check_trade(
+    trade: Trade, account: CashAccount, instrument: Instrument, holding: Decimal
+) -> None:
+    """Decisiones del PO: misma moneda que el instrumento y tenencia por cuenta."""
+    check_account(account, instrument)
     if trade.side is TradeSide.SELL and trade.quantity > holding:
         raise InvalidTradeError(f"No podés vender más de lo que tenés en esta cuenta ({holding})")
 

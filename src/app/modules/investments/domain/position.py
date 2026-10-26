@@ -5,6 +5,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
+from app.modules.investments.domain.event import EventKind, InstrumentEvent
 from app.modules.investments.domain.instrument import Instrument
 from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import CENTS, PRICE_PRECISION, Trade, TradeSide
@@ -47,29 +48,47 @@ class Position:
         return (self.unrealized_pnl / self.cost * 100).quantize(CENTS, ROUND_HALF_UP)
 
 
+def _release(
+    quantity: Decimal, cost: Decimal, realized: Decimal, out: Decimal, cash: Decimal
+) -> tuple[Decimal, Decimal, Decimal]:
+    """Sale `out` de la tenencia (venta o amortización) cobrando `cash`."""
+    out_cost = (cost * out / quantity).quantize(CENTS, ROUND_HALF_UP)
+    return quantity - out, cost - out_cost, realized + cash - out_cost
+
+
 def build_positions(
     trades: list[Trade],
     instruments: dict[UUID, Instrument],
     prices: dict[UUID, InstrumentPrice] | None = None,
+    events: list[InstrumentEvent] | None = None,
 ) -> list[Position]:
-    """Recorre las operaciones en orden: la compra suma al costo lo que salió de la cuenta y la
-    venta realiza lo que entró menos el costo promedio de lo vendido."""
+    """Recorre operaciones y eventos en orden: la compra suma al costo lo que salió de la cuenta,
+    la venta y la amortización realizan lo cobrado menos el costo promedio de lo que sale, y los
+    dividendos y cupones suman al resultado realizado (decisiones del PO)."""
     prices = prices or {}
     state: dict[tuple[UUID, UUID], tuple[Decimal, Decimal, Decimal, Trade]] = {}
-    for trade in sorted(trades, key=lambda t: (t.date, t.created_at)):
-        key = (trade.account_id, trade.instrument_id)
+    timeline: list[Trade | InstrumentEvent] = [*trades, *(events or [])]
+    for item in sorted(timeline, key=lambda i: (i.date, i.created_at)):
+        key = (item.account_id, item.instrument_id)
         zero = Decimal("0")
+        if isinstance(item, InstrumentEvent):
+            # Siempre hay una compra antes: un evento pide tenencia en la cuenta.
+            quantity, cost, realized, last = state[key]
+            if item.kind is EventKind.AMORTIZATION and item.nominal is not None:
+                quantity, cost, realized = _release(
+                    quantity, cost, realized, item.nominal, item.amount
+                )
+            else:
+                realized += item.amount
+            state[key] = (quantity, cost, realized, last)
+            continue
+        trade = item
         quantity, cost, realized, _ = state.get(key, (zero, zero, zero, trade))
         cash = trade.cash(instruments[trade.instrument_id].quote_unit)
         if trade.side is TradeSide.BUY:
             quantity, cost = quantity + trade.quantity, cost + cash
         else:
-            sold_cost = (cost * trade.quantity / quantity).quantize(CENTS, ROUND_HALF_UP)
-            quantity, cost, realized = (
-                quantity - trade.quantity,
-                cost - sold_cost,
-                realized + cash - sold_cost,
-            )
+            quantity, cost, realized = _release(quantity, cost, realized, trade.quantity, cash)
         state[key] = (quantity, cost, realized, trade)
     positions = []
     for (account_id, instrument_id), (quantity, cost, realized, last) in state.items():
