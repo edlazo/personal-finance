@@ -179,3 +179,37 @@ async def test_the_hourly_job_prices_crypto_positions(
     [position] = client.get("/positions", headers=auth).json()["positions"]
     assert (position["price_source"], position["current_price"]) == ("API", "80000.5000000000")
     assert position["valuation"] == "40000.25"
+
+
+def test_income_and_amortization_credit_the_account_and_change_the_position(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    broker = client.post(
+        "/accounts", headers=auth, json={"name": "IOL", "type": "BROKER", "currency": "ARS"}
+    ).json()["id"]
+    al30 = create(client, auth).json()["id"]
+    rate = {"type": "MEP", "buy": "1000", "sell": "1000", "quoted_at": "2026-01-02T12:00:00Z"}
+    client.post("/fx/rates", headers=auth, json=rate)
+    buy = {"account_id": broker, "instrument_id": al30, "side": "BUY", "quantity": "1000"}
+    client.post("/trades", headers=auth, json=buy | {"price": "75000", "date": "2026-10-20"})
+
+    def event(kind: str, amount: str, **extra: str) -> Response:
+        body = {"account_id": broker, "instrument_id": al30, "kind": kind, "amount": amount}
+        return client.post(
+            "/instrument-events", headers=auth, json=body | extra | {"date": "2026-10-24"}
+        )
+
+    coupon = event("COUPON", "5000.00")
+    amortization = event("AMORTIZATION", "200000.00", nominal="250")
+    dividend = event("DIVIDEND", "1.00")
+    balance = client.get(f"/accounts/{broker}", headers=auth).json()["balance"]
+    [position] = client.get("/positions", headers=auth).json()["positions"]
+    rentas = [
+        m for m in client.get("/transactions", headers=auth).json()["items"] if m["category_id"]
+    ]
+
+    assert (coupon.status_code, amortization.status_code, dividend.status_code) == (201, 201, 422)
+    assert balance == "-545000.00"
+    assert (position["quantity"], position["realized_pnl"]) == ("750.00000000", "17500.00")
+    assert [m["amount"] for m in rentas] == ["5000.00"]
