@@ -27,7 +27,7 @@ cryptography==50.0.2
 # httpx2 (pydantic/httpx2, verificado en PyPI el 2026-10-05) reemplaza a httpx:
 # starlette depreca el TestClient sobre httpx. httpx sigue instalado como
 # dependencia transitiva de fastapi[standard], pero el codigo no lo importa.
-httpx2==2.13.1
+httpx2==2.16.0
 tenacity==9.2.1
 
 # --- Jobs programados (cotizaciones, recurrentes, snapshots) ----------------
