@@ -14,6 +14,7 @@ from app.modules.investments.application.manage_instruments import (
     CreateInstrument,
     ListInstruments,
 )
+from app.modules.investments.application.register_price import RegisterPrice
 from app.modules.investments.application.register_trade import RegisterTrade
 from app.modules.investments.domain.instrument import InstrumentType, Market
 from app.modules.investments.domain.trade import TradeSide
@@ -160,8 +161,9 @@ class PositionResponse(BaseModel):
     # Precios por unidad (cada 100 VN en bonos y ONs), en la moneda del instrumento.
     average_price: Decimal
     current_price: Decimal
-    # Hasta la carga de precios (Sprint 8) es el de la última operación.
-    price_source: str = "LAST_TRADE"
+    # MANUAL (POST /prices) o LAST_TRADE: el de fecha más reciente.
+    price_source: str
+    price_date: date
     cost: Decimal
     valuation: Decimal
     unrealized_pnl: Decimal
@@ -209,6 +211,8 @@ async def list_positions(
                 quantity=p.quantity,
                 average_price=p.average_price,
                 current_price=p.current_price,
+                price_source=p.price_source,
+                price_date=p.price_date,
                 cost=p.cost,
                 valuation=p.valuation,
                 unrealized_pnl=p.unrealized_pnl,
@@ -219,3 +223,45 @@ async def list_positions(
             )
         )
     return PositionsResponse(rate_type=used, positions=positions)
+
+
+class CreatePriceRequest(BaseModel):
+    instrument_id: UUID
+    # Por unidad; en bonos y ONs, cada 100 de valor nominal.
+    price: Decimal = Field(gt=0, max_digits=28, decimal_places=10)
+    date: date
+
+
+class PriceResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    instrument_id: UUID
+    price: Decimal
+    date: date
+    source: str
+
+
+prices_router = APIRouter(
+    prefix="/prices",
+    tags=["inversiones"],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Token inválido o vencido"},
+        status.HTTP_404_NOT_FOUND: {"description": "El instrumento no existe"},
+    },
+)
+
+
+@prices_router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Cargar a mano el precio de un instrumento",
+    description="Suma al historial. Las posiciones usan el precio de fecha más reciente.",
+)
+async def create_price(
+    body: CreatePriceRequest, user_id: CurrentUserId, uow: InvestmentsUow
+) -> PriceResponse:
+    entry = await RegisterPrice(uow=uow)(
+        user_id, instrument_id=body.instrument_id, price=body.price, on=body.date
+    )
+    return PriceResponse.model_validate(entry)

@@ -7,6 +7,7 @@ from typing import Self
 from uuid import UUID
 
 from app.modules.investments.domain.instrument import Instrument, Market
+from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import Trade, TradeSide
 from app.shared.domain.cash import CashAccount
 from app.shared.domain.errors import NotFoundError
@@ -53,6 +54,20 @@ class InMemoryTrades:
         )
 
 
+class InMemoryPrices:
+    def __init__(self) -> None:
+        self.items: list[InstrumentPrice] = []
+
+    async def add(self, price: InstrumentPrice) -> None:
+        self.items.append(price)
+
+    async def latest_prices(self) -> dict[UUID, InstrumentPrice]:
+        latest: dict[UUID, InstrumentPrice] = {}
+        for price in sorted(self.items, key=lambda p: (p.date, p.created_at)):
+            latest[price.instrument_id] = price
+        return latest
+
+
 class FakeCash:
     """Las cuentas de ledger que ve investments y los movimientos que pidió."""
 
@@ -82,6 +97,7 @@ class FakeInvestmentsUnitOfWork:
     def __init__(self) -> None:
         self.instruments = InMemoryInstruments()
         self.trades = InMemoryTrades()
+        self.prices = InMemoryPrices()
         self.cash = FakeCash()
         self.commits = 0
 

@@ -18,6 +18,7 @@ from sqlalchemy import (
     func,
     select,
 )
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
@@ -28,6 +29,7 @@ from app.modules.investments.domain.instrument import (
     InstrumentType,
     Market,
 )
+from app.modules.investments.domain.price import InstrumentPrice, PriceSource
 from app.modules.investments.domain.trade import Trade, TradeSide
 from app.shared.domain.cash import CashMovements
 from app.shared.domain.money import Currency
@@ -67,6 +69,18 @@ class TradeModel(UserOwnedMixin, Base):
     price: Mapped[Decimal] = mapped_column(Numeric(28, 10))
     fee: Mapped[Decimal] = mapped_column(Numeric(20, 2))
     date: Mapped[date] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class InstrumentPriceModel(UserOwnedMixin, Base):
+    __tablename__ = "instrument_prices"
+
+    instrument_id: Mapped[UUID] = mapped_column(ForeignKey("instruments.id"), index=True)
+    price: Mapped[Decimal] = mapped_column(Numeric(28, 10))
+    date: Mapped[date] = mapped_column(Date)
+    source: Mapped[PriceSource] = mapped_column(
+        Enum(PriceSource, name="price_source", native_enum=False, length=10)
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -165,6 +179,44 @@ class SqlAlchemyTradeRepository(UserScopedRepository[TradeModel]):
         ]
 
 
+class SqlAlchemyPriceRepository(UserScopedRepository[InstrumentPriceModel]):
+    model = InstrumentPriceModel
+
+    async def add(self, price: InstrumentPrice) -> None:
+        self.session.add(
+            InstrumentPriceModel(
+                id=price.id,
+                user_id=price.user_id,
+                instrument_id=price.instrument_id,
+                price=price.price,
+                date=price.date,
+                source=price.source,
+                created_at=price.created_at,
+            )
+        )
+        await self.session.flush()
+
+    async def latest_prices(self) -> dict[UUID, InstrumentPrice]:
+        m = InstrumentPriceModel
+        query = (
+            self.scoped()
+            .ext(distinct_on(m.instrument_id))
+            .order_by(m.instrument_id, m.date.desc(), m.created_at.desc())
+        )
+        return {
+            row.instrument_id: InstrumentPrice(
+                id=row.id,
+                user_id=row.user_id,
+                instrument_id=row.instrument_id,
+                price=row.price,
+                date=row.date,
+                source=row.source,
+                created_at=row.created_at,
+            )
+            for row in await self.session.scalars(query)
+        }
+
+
 # Lo arma main.py con la implementación de ledger (contrato de app.shared).
 CashMovementsFactory = Callable[[AsyncSession, UUID], CashMovements]
 
@@ -172,6 +224,7 @@ CashMovementsFactory = Callable[[AsyncSession, UUID], CashMovements]
 class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
     instruments: SqlAlchemyInstrumentRepository
     trades: SqlAlchemyTradeRepository
+    prices: SqlAlchemyPriceRepository
     cash: CashMovements
 
     def __init__(
@@ -188,6 +241,7 @@ class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
         await super().__aenter__()
         self.instruments = SqlAlchemyInstrumentRepository(self.session, self._user_id)
         self.trades = SqlAlchemyTradeRepository(self.session, self._user_id)
+        self.prices = SqlAlchemyPriceRepository(self.session, self._user_id)
         # Misma sesión: la operación y el movimiento de ledger se confirman juntos.
         self.cash = self._cash(self.session, self._user_id)
         return self

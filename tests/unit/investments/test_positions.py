@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from app.modules.investments.application.list_positions import ListPositions
 from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
 from app.modules.investments.domain.position import build_positions
+from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import Trade, TradeSide
 from app.shared.domain.money import Currency
 from app.shared.domain.rates import RateType
@@ -99,3 +100,16 @@ async def test_positions_are_valued_in_ars_and_usd() -> None:
         Decimal("10000.00"),
         Decimal("10"),
     )
+
+
+def test_the_most_recent_price_wins_and_manual_wins_a_tie() -> None:
+    trades = [trade(GGAL, BUY, "1", "100", day=10)]
+
+    def priced(day: int) -> tuple[Decimal, str]:
+        manual = InstrumentPrice(USER, GGAL.id, Decimal("150"), date(2026, 10, day))
+        [position] = build_positions(trades, {GGAL.id: GGAL}, {GGAL.id: manual})
+        return position.current_price, position.price_source
+
+    assert priced(11) == (Decimal("150"), "MANUAL")
+    assert priced(10) == (Decimal("150"), "MANUAL")
+    assert priced(9) == (Decimal("100"), "LAST_TRADE")

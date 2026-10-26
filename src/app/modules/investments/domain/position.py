@@ -1,10 +1,12 @@
 """Tenencia y resultados por cuenta e instrumento, con costo promedio ponderado."""
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from app.modules.investments.domain.instrument import Instrument
+from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import CENTS, PRICE_PRECISION, Trade, TradeSide
 
 
@@ -16,8 +18,10 @@ class Position:
     # Lo que costó la tenencia actual, con las comisiones de compra (decisión del PO).
     cost: Decimal
     realized_pnl: Decimal
-    # shortcut: precio de la última operación hasta la carga de precios (US-029, Sprint 8).
     current_price: Decimal
+    # MANUAL o LAST_TRADE: el de fecha más reciente (decisión del PO).
+    price_source: str
+    price_date: date
 
     @property
     def average_price(self) -> Decimal:
@@ -43,13 +47,19 @@ class Position:
         return (self.unrealized_pnl / self.cost * 100).quantize(CENTS, ROUND_HALF_UP)
 
 
-def build_positions(trades: list[Trade], instruments: dict[UUID, Instrument]) -> list[Position]:
+def build_positions(
+    trades: list[Trade],
+    instruments: dict[UUID, Instrument],
+    prices: dict[UUID, InstrumentPrice] | None = None,
+) -> list[Position]:
     """Recorre las operaciones en orden: la compra suma al costo lo que salió de la cuenta y la
     venta realiza lo que entró menos el costo promedio de lo vendido."""
-    state: dict[tuple[UUID, UUID], tuple[Decimal, Decimal, Decimal, Decimal]] = {}
+    prices = prices or {}
+    state: dict[tuple[UUID, UUID], tuple[Decimal, Decimal, Decimal, Trade]] = {}
     for trade in sorted(trades, key=lambda t: (t.date, t.created_at)):
         key = (trade.account_id, trade.instrument_id)
-        quantity, cost, realized, _ = state.get(key, (Decimal("0"),) * 4)
+        zero = Decimal("0")
+        quantity, cost, realized, _ = state.get(key, (zero, zero, zero, trade))
         cash = trade.cash(instruments[trade.instrument_id].quote_unit)
         if trade.side is TradeSide.BUY:
             quantity, cost = quantity + trade.quantity, cost + cash
@@ -60,9 +70,17 @@ def build_positions(trades: list[Trade], instruments: dict[UUID, Instrument]) ->
                 cost - sold_cost,
                 realized + cash - sold_cost,
             )
-        state[key] = (quantity, cost, realized, trade.price)
-    positions = [
-        Position(account_id, instruments[instrument_id], quantity, cost, realized, price)
-        for (account_id, instrument_id), (quantity, cost, realized, price) in state.items()
-    ]
+        state[key] = (quantity, cost, realized, trade)
+    positions = []
+    for (account_id, instrument_id), (quantity, cost, realized, last) in state.items():
+        manual = prices.get(instrument_id)
+        # A igual fecha gana el precio cargado a mano.
+        if manual is not None and manual.date >= last.date:
+            price, source, on = manual.price, "MANUAL", manual.date
+        else:
+            price, source, on = last.price, "LAST_TRADE", last.date
+        instrument = instruments[instrument_id]
+        positions.append(
+            Position(account_id, instrument, quantity, cost, realized, price, source, on)
+        )
     return sorted(positions, key=lambda p: (p.instrument.ticker, str(p.account_id)))
