@@ -17,7 +17,7 @@
 | **PF-E3** Movimientos | Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD). | 9 | 23 |
 | **PF-E4** Cotizaciones | Cotizaciones MEP/oficial/blue/CCL/cripto automáticas y manuales; conversión ARS<->USD. | 5 | 15 |
 | **PF-E5** Inversiones | Instrumentos (acciones, CEDEARs, bonos, ETFs, ONs, cripto), operaciones, posiciones y P&L. | 5 | 19 |
-| **PF-E6** Integraciones de mercado | Precios desde IOL, data912 y CoinGecko. | 5 | 15 |
+| **PF-E6** Integraciones de mercado | Portafolio y precios desde IOL, data912 y CoinGecko; órdenes a IOL a futuro. | 6 | 15 + US-064 sin estimar |
 | **PF-E7** Tarjetas de crédito | Tarjetas, ciclos de resumen, compras en cuotas y pagos. | 4 | 13 |
 | **PF-E8** Deudas | Préstamos y deudas con cronograma de pagos. | 2 | 8 |
 | **PF-E9** Planificación | Movimientos recurrentes y presupuestos mensuales por categoría. | 4 | 12 |
@@ -435,17 +435,18 @@ _Precios desde IOL, data912 y CoinGecko. Balanz quedó fuera en la Review del Sp
 - [ ] Adaptador `CoinGeckoProvider` (puerto `PriceProvider`) para instrumentos CRYPTO
 - [ ] Job periodico; tests con `httpx2.MockTransport`
 
-### US-033 - Precios desde IOL
-`Story` | **5 SP** | Prioridad **High** | Sprint 8 | label `integrations`
+### US-033 - Portafolio y precios desde IOL
+`Story` | **5 SP** | Prioridad **High** | Sprint 9 | label `integrations`
 
-**Como** inversor, **quiero** obtener precios de acciones, CEDEARs, bonos y ONs desde IOL, **para** valuar mi cartera automáticamente.
+**Como** inversor, **quiero** traer mi portafolio de IOL con sus precios, **para** valuar mi cartera automáticamente sin cargar operaciones a mano.
 
 **Criterios de aceptación**
-- [ ] Adaptador `IolPriceProvider` con OAuth2 password grant y refresh de token
-- [ ] Job que actualiza precios de instrumentos en cartera
+- [ ] Una cuenta comitente se vincula a IOL; sus tenencias y precios salen de `GET /api/v2/portafolio/argentina` (decisión del PO: en esa cuenta IOL manda y no se cargan operaciones a mano)
+- [ ] Job que sincroniza el portafolio cada 30 min en horario de mercado: 1 llamada de autenticación y 1 de portafolio por corrida (unas 570 por mes, el 2 % del límite)
+- [ ] Autenticación con usuario y contraseña cifrados (US-032) en cada corrida: el refresh token de IOL vence a los 20 minutos de emitido
 - [ ] Errores de autenticación se notifican sin romper el job
 - [ ] **Límite de IOL: 25.000 llamadas por mes; pasarlo se cobra.** Contador mensual persistido de todas las llamadas (autenticación incluida); al llegar al presupuesto configurable (por defecto 20.000, el 80 %) el job deja de llamar a IOL hasta el mes siguiente y lo loguea
-- [ ] Frecuencia y cantidad de instrumentos calculadas para quedar dentro del presupuesto
+- [ ] Solo lectura: no se envían órdenes (eso es US-064)
 
 ### US-034 - Precios de respaldo desde data912
 `Story` | **3 SP** | Prioridad **Medium** | Sprint 8 | label `integrations`
@@ -455,6 +456,19 @@ _Precios desde IOL, data912 y CoinGecko. Balanz quedó fuera en la Review del Sp
 **Criterios de aceptación**
 - [ ] Adaptador `Data912Provider` para CEDEARs, bonos y ONs
 - [ ] Estrategia de proveedores configurable por prioridad (IOL > data912 > manual)
+
+### US-064 - Enviar órdenes de compra y venta a IOL
+`Story` | **? SP** | Prioridad **Low** | Sin sprint | label `integrations` | agregada en la Retro del Sprint 7
+
+**Como** inversor, **quiero** mandar órdenes de compra y venta a IOL desde la app, **para** operar sin entrar al sitio del broker.
+
+**Criterios de aceptación**
+- [ ] Crear y cancelar órdenes de compra y venta en la cuenta vinculada a IOL, con confirmación explícita del usuario antes de enviar
+- [ ] Desarrollo y tests contra el sandbox de IOL; nunca contra la cuenta real en los tests
+- [ ] Cada orden cuenta para el límite de 25.000 llamadas por mes
+- [ ] La operación ejecutada se refleja en el portafolio sincronizado (US-033)
+
+_Idea del PO: por ahora no, primero hay que probar con el sandbox._
 
 ### US-036 - Importar movimientos de Balanz
 `Story` | **5 SP** | Prioridad **Medium** | Descartada | label `integrations`
