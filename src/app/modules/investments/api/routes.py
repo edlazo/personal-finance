@@ -14,8 +14,10 @@ from app.modules.investments.application.manage_instruments import (
     CreateInstrument,
     ListInstruments,
 )
+from app.modules.investments.application.register_event import RegisterEvent
 from app.modules.investments.application.register_price import RegisterPrice
 from app.modules.investments.application.register_trade import RegisterTrade
+from app.modules.investments.domain.event import EventKind
 from app.modules.investments.domain.instrument import InstrumentType, Market
 from app.modules.investments.domain.trade import TradeSide
 from app.modules.investments.infrastructure.persistence import SqlAlchemyInvestmentsUnitOfWork
@@ -265,3 +267,60 @@ async def create_price(
         user_id, instrument_id=body.instrument_id, price=body.price, on=body.date
     )
     return PriceResponse.model_validate(entry)
+
+
+class CreateEventRequest(BaseModel):
+    account_id: UUID
+    instrument_id: UUID
+    kind: EventKind
+    # Lo cobrado, en la moneda del instrumento.
+    amount: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
+    # Solo en AMORTIZATION: el valor nominal que se devolvió.
+    nominal: Decimal | None = Field(default=None, gt=0, max_digits=28, decimal_places=8)
+    date: date
+
+
+class EventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    account_id: UUID
+    instrument_id: UUID
+    kind: EventKind
+    amount: Decimal
+    nominal: Decimal | None
+    date: date
+
+
+events_router = APIRouter(
+    prefix="/instrument-events",
+    tags=["inversiones"],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Token inválido o vencido"},
+        status.HTTP_404_NOT_FOUND: {"description": "La cuenta o el instrumento no existe"},
+    },
+)
+
+
+@events_router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar un dividendo, un cupón o una amortización",
+    description=(
+        "Acredita la cuenta. Dividendos y cupones son ingreso en Rentas y suman al P&L realizado; "
+        "la amortización es un rescate parcial: baja la tenencia (VN) y el costo en proporción."
+    ),
+)
+async def create_event(
+    body: CreateEventRequest, user_id: CurrentUserId, uow: InvestmentsUow
+) -> EventResponse:
+    event = await RegisterEvent(uow=uow)(
+        user_id,
+        account_id=body.account_id,
+        instrument_id=body.instrument_id,
+        kind=body.kind,
+        amount=body.amount,
+        on=body.date,
+        nominal=body.nominal,
+    )
+    return EventResponse.model_validate(event)
