@@ -89,6 +89,7 @@ def test_the_cookie_is_secure_in_production() -> None:
         _env_file=None,
         environment="production",
         jwt_secret=SecretStr("una-clave-de-produccion-de-32-caracteres"),
+        credentials_key=SecretStr("PEoYk1W6c1r0Xk5lTE7rVQzp3o3t5TQxZb0fJ0r9mUo="),
     )
     with make_client(settings) as client:
         response = client.post("/auth/login", json=CREDENTIALS)

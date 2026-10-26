@@ -6,8 +6,9 @@ from typing import Literal, Self
 from pydantic import Field, PostgresDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Solo para desarrollo: el validador de Settings lo rechaza en producción.
+# Solo para desarrollo: el validador de Settings los rechaza en producción.
 DEV_JWT_SECRET = "solo-para-desarrollo-no-usar-en-produccion"  # noqa: S105
+DEV_CREDENTIALS_KEY = "w9HPIFePW5yJqW1tbWMmPN6KkdcFRMf76RUlGcJ9-qE="
 
 
 class Settings(BaseSettings):
@@ -26,6 +27,9 @@ class Settings(BaseSettings):
     jwt_secret: SecretStr = Field(default=SecretStr(DEV_JWT_SECRET), min_length=32)
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    # Clave Fernet para cifrar las credenciales de brokers (PF-49). Se genera con
+    # Fernet.generate_key(); si se pierde, las credenciales guardadas no se pueden leer.
+    credentials_key: SecretStr = SecretStr(DEV_CREDENTIALS_KEY)
     # Cotizaciones automáticas (PF-39): días hábiles cada 30 min en esas horas (sintaxis cron:
     # "10-17" es de 10:00 a 17:30); sábados y domingos, una vez a la hora diaria.
     dolarapi_url: str = "https://dolarapi.com/v1/dolares"
@@ -42,6 +46,9 @@ class Settings(BaseSettings):
         using_dev_secret = self.jwt_secret.get_secret_value() == DEV_JWT_SECRET
         if self.environment == "production" and using_dev_secret:
             raise ValueError("JWT_SECRET es obligatorio en producción")
+        using_dev_key = self.credentials_key.get_secret_value() == DEV_CREDENTIALS_KEY
+        if self.environment == "production" and using_dev_key:
+            raise ValueError("CREDENTIALS_KEY es obligatoria en producción")
         return self
 
 

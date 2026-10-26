@@ -6,6 +6,7 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID
 
+from app.modules.investments.domain.credentials import Broker, BrokerCredentials
 from app.modules.investments.domain.event import InstrumentEvent
 from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
 from app.modules.investments.domain.price import InstrumentPrice
@@ -177,3 +178,23 @@ class FakeInvestmentsUnitOfWork:
 
     async def rollback(self) -> None:
         pass
+
+
+class InMemoryCredentials:
+    def __init__(self) -> None:
+        self.items: dict[Broker, BrokerCredentials] = {}
+
+    async def save(self, credentials: BrokerCredentials) -> None:
+        self.items[credentials.broker] = credentials
+
+    async def get_credentials(self, broker: Broker) -> BrokerCredentials | None:
+        return self.items.get(broker)
+
+    async def delete(self, broker: Broker) -> None:
+        self.items.pop(broker, None)
+
+
+class FakeCredentialsUnitOfWork(FakePriceSyncUnitOfWork):
+    def __init__(self) -> None:
+        super().__init__()
+        self.credentials = InMemoryCredentials()
