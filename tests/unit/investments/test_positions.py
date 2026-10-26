@@ -113,3 +113,17 @@ def test_the_most_recent_price_wins_and_manual_wins_a_tie() -> None:
     assert priced(11) == (Decimal("150"), "MANUAL")
     assert priced(10) == (Decimal("150"), "MANUAL")
     assert priced(9) == (Decimal("100"), "LAST_TRADE")
+
+
+def test_money_without_movements_keeps_two_decimals() -> None:
+    # La API serializa Decimal como texto: "0" en vez de "0.00" se ve distinto en el front.
+    bought = trade(GGAL, BUY, "1", "10")
+    closed = [trade(AL30, BUY, "1", "10"), trade(AL30, SELL, "1", "10", day=2)]
+
+    by_ticker = {
+        p.instrument.ticker: p
+        for p in build_positions([bought, *closed], {GGAL.id: GGAL, AL30.id: AL30})
+    }
+
+    assert str(by_ticker["GGAL"].realized_pnl) == "0.00"
+    assert str(by_ticker["AL30"].unrealized_pnl_pct) == "0.00"

@@ -44,7 +44,7 @@ class Position:
     @property
     def unrealized_pnl_pct(self) -> Decimal:
         if not self.cost:
-            return Decimal("0")
+            return Decimal("0.00")
         return (self.unrealized_pnl / self.cost * 100).quantize(CENTS, ROUND_HALF_UP)
 
 
@@ -70,7 +70,8 @@ def build_positions(
     timeline: list[Trade | InstrumentEvent] = [*trades, *(events or [])]
     for item in sorted(timeline, key=lambda i: (i.date, i.created_at)):
         key = (item.account_id, item.instrument_id)
-        zero = Decimal("0")
+        # Montos con dos decimales desde el arranque: la API los muestra como "0.00".
+        zero = Decimal("0.00")
         if isinstance(item, InstrumentEvent):
             # Siempre hay una compra antes: un evento pide tenencia en la cuenta.
             quantity, cost, realized, last = state[key]
