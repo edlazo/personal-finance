@@ -23,7 +23,7 @@ def uow() -> FakeLedgerUnitOfWork:
 
 
 def add_account(uow: FakeLedgerUnitOfWork) -> Account:
-    account = Account(USER, "Galicia", AccountType.SAVINGS, Currency.ARS, Decimal("0"))
+    account = Account(USER, "Galicia", AccountType.SAVINGS, Currency.ARS, Decimal("1000000"))
     uow.accounts.items[account.id] = account
     return account
 

@@ -16,7 +16,7 @@ USER = uuid4()
 
 
 def add(uow: FakeLedgerUnitOfWork, name: str, currency: Currency = Currency.ARS) -> Account:
-    account = Account(USER, name, AccountType.SAVINGS, currency, Decimal("0"))
+    account = Account(USER, name, AccountType.SAVINGS, currency, Decimal("1000000"))
     uow.accounts.items[account.id] = account
     return account
 

@@ -44,7 +44,15 @@ def sign_up(client: TestClient) -> Callable[[], dict[str, str]]:
 def setup(client: TestClient, auth: dict[str, str]) -> tuple[str, dict[str, str]]:
     """Crea una cuenta y devuelve su id y las categorías por nombre y tipo."""
     account = client.post(
-        "/accounts", headers=auth, json={"name": "Galicia", "type": "SAVINGS", "currency": "ARS"}
+        "/accounts",
+        headers=auth,
+        # Con saldo: un gasto no puede dejar la cuenta en negativo (US-062).
+        json={
+            "name": "Galicia",
+            "type": "SAVINGS",
+            "currency": "ARS",
+            "initial_balance": "1000000",
+        },
     )
     categories = {
         f"{c['kind']}:{c['name']}": c["id"] for c in client.get("/categories", headers=auth).json()
@@ -171,7 +179,7 @@ def test_transfer_moves_money_between_own_accounts(
 
     assert created.status_code == 201
     group = created.json()["transfer_group_id"]
-    assert balances == {"Galicia": "-300.00", "Caja": "300.00", "Dólares": "0.00"}
+    assert balances == {"Galicia": "999700.00", "Caja": "300.00", "Dólares": "0.00"}
     assert [(t["category_id"], t["transfer_group_id"]) for t in listed] == [(None, group)] * 2
     assert send(galicia, galicia).status_code == 422
     assert send(galicia, usd).status_code == 422
@@ -202,7 +210,7 @@ def test_edit_and_delete_movements_and_transfers(
 
     assert (edited.status_code, edited.json()["amount"]) == (200, "99.90")
     assert moved.json()["amount"] == "250.00"
-    assert balances == {"Galicia": "-349.90", "Caja": "250.00"}
+    assert balances == {"Galicia": "999650.10", "Caja": "250.00"}
     other = sign_up()
     assert client.delete(f"/transactions/{movement}", headers=other).status_code == 404
     assert client.delete(f"/transactions/{legs['outgoing']['id']}", headers=auth).status_code == 204
@@ -241,7 +249,7 @@ def test_buying_dollars_with_a_fee(
     assert names[bought.json()["fee"]["category_id"]] == "Comisiones"
     assert missing.status_code == 422
     assert edited.json()["amount"] == "99.50"
-    assert balances == {"Galicia": "-125500.00", "Dólares": "99.50"}
+    assert balances == {"Galicia": "874500.00", "Dólares": "99.50"}
 
 
 async def test_other_modules_move_cash_through_ledger(
@@ -322,3 +330,25 @@ async def test_income_from_investments_lands_in_rentas_and_is_read_only(
         await session.commit()
     newest = client.get("/transactions", headers=auth).json()["items"][0]
     assert newest["category_id"] != rentas["id"]
+
+
+def test_an_expense_beyond_the_balance_is_rejected_except_in_a_broker(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    _, categories = setup(client, auth)
+    caja, iol = (
+        client.post(
+            "/accounts",
+            headers=auth,
+            json={"name": name, "type": kind, "currency": "ARS", "initial_balance": "100.00"},
+        ).json()["id"]
+        for name, kind in (("Caja", "CASH"), ("IOL", "BROKER"))
+    )
+
+    rejected = expense(client, auth, caja, categories["EXPENSE:Ocio"], amount="100.01")
+    allowed = expense(client, auth, iol, categories["EXPENSE:Ocio"], amount="500.00")
+
+    assert rejected.status_code == 422
+    assert "Caja quedaría con saldo negativo el 24/10/2026" in rejected.json()["detail"]
+    assert allowed.status_code == 201

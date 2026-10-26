@@ -44,6 +44,25 @@ class AccountArchivedError(ConflictError):
         super().__init__("La cuenta está archivada y no se puede editar")
 
 
+class NegativeBalanceError(DomainError):
+    def __init__(self, name: str, on: date) -> None:
+        super().__init__(f"La cuenta {name} quedaría con saldo negativo el {on:%d/%m/%Y}")
+
+
+def check_non_negative(account: Account, daily: dict[date, Decimal], since: date) -> None:
+    """El saldo al cierre de cada día, desde `since` en adelante, no puede ser negativo (US-062).
+
+    Las comitentes sí pueden quedar en negativo (decisión del PO del Sprint 4).
+    """
+    if account.type is AccountType.BROKER:
+        return
+    balance = account.initial_balance
+    for day in sorted(daily):
+        balance += daily[day]
+        if day >= since and balance < 0:
+            raise NegativeBalanceError(account.name, day)
+
+
 def same_name(name: str) -> str:
     """Forma de comparar nombres: sin espacios sobrantes ni distinguir mayúsculas.
 

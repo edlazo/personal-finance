@@ -164,7 +164,12 @@ async def test_the_hourly_job_prices_crypto_positions(
     wallet = client.post(
         "/accounts",
         headers=auth,
-        json={"name": "Wallet", "type": "CRYPTO_WALLET", "currency": "USD"},
+        json={
+            "name": "Wallet",
+            "type": "CRYPTO_WALLET",
+            "currency": "USD",
+            "initial_balance": "50000",
+        },
     ).json()["id"]
     btc = create(
         client, auth, ticker="BTC", name="Bitcoin", type="CRYPTO", market="CRYPTO", currency="USD"
@@ -213,3 +218,30 @@ def test_income_and_amortization_credit_the_account_and_change_the_position(
     assert balance == "-545000.00"
     assert (position["quantity"], position["realized_pnl"]) == ("750.00000000", "17500.00")
     assert [m["amount"] for m in rentas] == ["5000.00"]
+
+
+def test_a_purchase_cannot_leave_a_crypto_wallet_negative(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    wallet = client.post(
+        "/accounts",
+        headers=auth,
+        json={
+            "name": "Wallet",
+            "type": "CRYPTO_WALLET",
+            "currency": "USD",
+            "initial_balance": "100",
+        },
+    ).json()["id"]
+    btc = create(
+        client, auth, ticker="BTC", name="Bitcoin", type="CRYPTO", market="CRYPTO", currency="USD"
+    ).json()["id"]
+    body = {"account_id": wallet, "instrument_id": btc, "side": "BUY", "quantity": "0.01"}
+
+    too_much = client.post(
+        "/trades", headers=auth, json=body | {"price": "80000", "date": "2026-10-24"}
+    )
+
+    assert too_much.status_code == 422
+    assert client.get(f"/accounts/{wallet}", headers=auth).json()["balance"] == "100.00"
