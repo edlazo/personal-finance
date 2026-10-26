@@ -222,7 +222,14 @@ class SqlAlchemyPriceRepository(UserScopedRepository[InstrumentPriceModel]):
         query = (
             self.scoped()
             .ext(distinct_on(m.instrument_id))
-            .order_by(m.instrument_id, m.date.desc(), m.created_at.desc())
+            .order_by(
+                m.instrument_id,
+                # shortcut: un precio API viejo de algo que la fuente dejó de cotizar le sigue
+                # ganando al manual; si pasa, filtrar los API de más de unos días.
+                case((m.source == PriceSource.API, 0), else_=1),
+                m.date.desc(),
+                m.created_at.desc(),
+            )
         )
         return {
             row.instrument_id: InstrumentPrice(
@@ -332,6 +339,10 @@ class SqlAlchemyCryptoPriceStore:
 
     async def list_crypto(self) -> list[Instrument]:
         query = select(InstrumentModel).where(InstrumentModel.type == InstrumentType.CRYPTO)
+        return [_to_domain(model) for model in await self.session.scalars(query)]
+
+    async def list_listed(self) -> list[Instrument]:
+        query = select(InstrumentModel).where(InstrumentModel.market != Market.CRYPTO)
         return [_to_domain(model) for model in await self.session.scalars(query)]
 
     async def add(self, price: InstrumentPrice) -> None:

@@ -22,7 +22,11 @@ from app.modules.investments.infrastructure.credentials import (
     BrokerCredentialsModel,
     HoldingSnapshotModel,
 )
-from app.modules.investments.infrastructure.jobs import sync_crypto_prices, sync_iol_portfolios
+from app.modules.investments.infrastructure.jobs import (
+    sync_crypto_prices,
+    sync_iol_portfolios,
+    sync_market_prices,
+)
 from app.modules.investments.infrastructure.persistence import (
     InstrumentModel,
     SqlAlchemyInvestmentsUnitOfWork,
@@ -419,3 +423,28 @@ class OnlyElias(FixedIol):
         if username != "elias":
             raise RuntimeError("IOL rechazó las credenciales")
         return await super().portfolio(username, password)
+
+
+async def test_the_market_job_price_beats_a_newer_manual_one(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    auth = sign_up()
+    body = {"name": "Broker", "type": "BROKER", "currency": "ARS", "initial_balance": "100000"}
+    broker = client.post("/accounts", headers=auth, json=body).json()["id"]
+    ggal = create(client, auth, ticker="GGAL", name="Galicia", type="STOCK").json()["id"]
+    trade = {"account_id": broker, "instrument_id": ggal, "side": "BUY", "quantity": "1"}
+    client.post("/trades", headers=auth, json=trade | {"price": "6000", "date": "2026-10-01"})
+    rate = {"type": "MEP", "buy": "1000", "sell": "1000", "quoted_at": "2026-01-02T12:00:00Z"}
+    client.post("/fx/rates", headers=auth, json=rate)
+    future = {"instrument_id": ggal, "price": "1", "date": "2099-01-01"}
+    client.post("/prices", headers=auth, json=future)
+
+    await sync_market_prices(create_session_factory(engine), FixedData912(), ZoneInfo("UTC"))
+
+    [position] = client.get("/positions", headers=auth).json()["positions"]
+    assert (position["price_source"], position["current_price"]) == ("API", "6500.0000000000")
+
+
+class FixedData912:
+    async def market_prices(self) -> dict[tuple[Market, str], dict[Currency, Decimal]]:
+        return {(Market.BYMA, "GGAL"): {Currency.ARS: Decimal("6500")}}

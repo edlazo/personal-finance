@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import UUID, uuid4
 
-from app.modules.investments.domain.instrument import Instrument
+from app.modules.investments.domain.instrument import Instrument, Market
 from app.modules.investments.domain.trade import PRICE_PRECISION, InvalidTradeError
 from app.shared.domain.money import Currency
 
@@ -38,7 +38,8 @@ class PriceRepository(Protocol):
     async def add(self, price: InstrumentPrice) -> None: ...
 
     async def latest_prices(self) -> dict[UUID, InstrumentPrice]:
-        """El precio más reciente de cada instrumento, por fecha y después por carga."""
+        """Decisión del PO: el automático (API) gana al manual aunque sea más viejo; entre los
+        de la misma fuente, el de fecha más reciente y después el último cargado."""
         ...
 
 
@@ -48,9 +49,19 @@ class PriceProvider(Protocol):
         ...
 
 
+class MarketPriceProvider(Protocol):
+    async def market_prices(self) -> dict[tuple[Market, str], dict[Currency, Decimal]]:
+        """Precio actual por mercado y ticker, en la moneda en que cotiza."""
+        ...
+
+
 class CryptoPriceStore(Protocol):
-    """Para el job: ve los instrumentos cripto de todos los usuarios."""
+    """Para los jobs: ve los instrumentos de todos los usuarios."""
 
     async def list_crypto(self) -> list[Instrument]: ...
+
+    async def list_listed(self) -> list[Instrument]:
+        """Los que cotizan en BYMA, NYSE o NASDAQ."""
+        ...
 
     async def add(self, price: InstrumentPrice) -> None: ...

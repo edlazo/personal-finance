@@ -1,4 +1,4 @@
-"""Jobs del worker: precios de cripto desde CoinGecko y portafolio de IOL."""
+"""Jobs del worker: precios de cripto (CoinGecko) y de mercado (data912), y portafolio de IOL."""
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -10,10 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.modules.investments.application.sync_crypto_prices import SyncCryptoPrices
+from app.modules.investments.application.sync_market_prices import SyncMarketPrices
 from app.modules.investments.application.sync_portfolio import SyncPortfolio
 from app.modules.investments.domain.credentials import Broker, CredentialCipher
 from app.modules.investments.domain.portfolio import CallBudgetExhaustedError, PortfolioClient
-from app.modules.investments.domain.price import PriceProvider
+from app.modules.investments.domain.price import MarketPriceProvider, PriceProvider
 from app.modules.investments.infrastructure.cipher import FernetCipher
 from app.modules.investments.infrastructure.credentials import users_to_sync
 from app.modules.investments.infrastructure.persistence import (
@@ -36,6 +37,18 @@ async def sync_crypto_prices(
         logger.exception("crypto_prices_sync_failed")
         return
     logger.info("crypto_prices_synced", saved=saved)
+
+
+async def sync_market_prices(
+    session_factory: async_sessionmaker[AsyncSession], provider: MarketPriceProvider, tz: ZoneInfo
+) -> None:
+    sync = SyncMarketPrices(SqlAlchemyPriceSyncUnitOfWork(session_factory), provider)
+    try:
+        saved = await sync(datetime.now(tz).date())
+    except Exception:
+        logger.exception("market_prices_sync_failed")
+        return
+    logger.info("market_prices_synced", saved=saved)
 
 
 async def sync_iol_portfolios(
@@ -69,6 +82,7 @@ def schedule_investment_jobs(
     provider: PriceProvider,
     iol: PortfolioClient,
     cash: CashMovementsFactory,
+    market: MarketPriceProvider,
 ) -> None:
     # Cripto opera todo el día: cada hora en punto (decisión del PO).
     tz = ZoneInfo(settings.fx_timezone)
@@ -85,4 +99,8 @@ def schedule_investment_jobs(
         rounds,
         args=[session_factory, iol, cipher, cash, settings.iol_monthly_calls, tz],
         id="iol_portfolios",
+    )
+    # data912, mismo horario que IOL (decisión del PO): 7 pedidos por corrida.
+    scheduler.add_job(
+        sync_market_prices, rounds, args=[session_factory, market, tz], id="market_prices"
     )
