@@ -9,6 +9,7 @@ from uuid import UUID
 from app.modules.investments.domain.credentials import Broker, BrokerCredentials, BrokerLink
 from app.modules.investments.domain.event import InstrumentEvent
 from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
+from app.modules.investments.domain.portfolio import HoldingSnapshot
 from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import Trade, TradeSide
 from app.shared.domain.cash import CashAccount
@@ -114,6 +115,14 @@ class InMemoryLinks:
         return next((b for b, link in self.items.items() if link.account_id == account_id), None)
 
 
+class InMemorySnapshots:
+    def __init__(self) -> None:
+        self.items: list[HoldingSnapshot] = []
+
+    async def list_snapshots(self) -> list[HoldingSnapshot]:
+        return list(self.items)
+
+
 class FakeCash:
     """Las cuentas de ledger que ve investments y los movimientos que pidió."""
 
@@ -175,6 +184,7 @@ class FakeInvestmentsUnitOfWork:
         self.prices = InMemoryPrices()
         self.events = InMemoryEvents()
         self.links = InMemoryLinks()
+        self.snapshots = InMemorySnapshots()
         self.cash = FakeCash()
         self.commits = 0
 

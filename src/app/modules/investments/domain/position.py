@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.modules.investments.domain.event import EventKind, InstrumentEvent
 from app.modules.investments.domain.instrument import Instrument
+from app.modules.investments.domain.portfolio import HoldingSnapshot
 from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import CENTS, PRICE_PRECISION, Trade, TradeSide
 
@@ -103,3 +104,27 @@ def build_positions(
             Position(account_id, instrument, quantity, cost, realized, price, source, on)
         )
     return sorted(positions, key=lambda p: (p.instrument.ticker, str(p.account_id)))
+
+
+def snapshot_positions(
+    snapshots: list[HoldingSnapshot], instruments: dict[UUID, Instrument]
+) -> list[Position]:
+    """Posiciones de la cuenta vinculada (decisión del PO): el costo sale del precio promedio de
+    compra del broker y no hay P&L realizado, porque el portafolio no lo informa."""
+    positions = []
+    for s in snapshots:
+        instrument = instruments[s.instrument_id]
+        cost = (s.average_price * s.quantity / instrument.quote_unit).quantize(CENTS, ROUND_HALF_UP)
+        positions.append(
+            Position(
+                s.account_id,
+                instrument,
+                s.quantity,
+                cost,
+                Decimal("0.00"),
+                s.last_price,
+                "IOL",
+                s.taken_at.date(),
+            )
+        )
+    return positions
