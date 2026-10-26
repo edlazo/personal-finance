@@ -116,3 +116,31 @@ def test_positions_show_cost_result_and_value_in_both_currencies(
     assert (position["realized_pnl"], position["valuation"]) == ("196.00", "900.00")
     assert (position["valuation_ars"], position["valuation_usd"]) == ("900.00", "0.72")
     assert position["unrealized_pnl_pct"] == "48.51"
+
+
+def test_a_manual_price_values_the_position_when_it_is_the_most_recent(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+    broker = client.post(
+        "/accounts", headers=auth, json={"name": "IOL", "type": "BROKER", "currency": "ARS"}
+    ).json()["id"]
+    ggal = create(client, auth, ticker="GGAL", name="Galicia", type="STOCK").json()["id"]
+    rate = {"type": "MEP", "buy": "1000", "sell": "1000", "quoted_at": "2026-01-02T12:00:00Z"}
+    client.post("/fx/rates", headers=auth, json=rate)
+    body = {"account_id": broker, "instrument_id": ggal, "side": "BUY", "quantity": "10"}
+    client.post("/trades", headers=auth, json=body | {"price": "100", "date": "2026-10-20"})
+
+    price = client.post(
+        "/prices", headers=auth, json={"instrument_id": ggal, "price": "130", "date": "2026-10-24"}
+    )
+    other = client.post(
+        "/prices",
+        headers=sign_up(),
+        json={"instrument_id": ggal, "price": "1", "date": "2026-10-24"},
+    )
+    [position] = client.get("/positions", headers=auth).json()["positions"]
+
+    assert (price.status_code, price.json()["source"], other.status_code) == (201, "MANUAL", 404)
+    assert (position["price_source"], position["price_date"]) == ("MANUAL", "2026-10-24")
+    assert (position["valuation"], position["unrealized_pnl"]) == ("1300.00", "300.00")

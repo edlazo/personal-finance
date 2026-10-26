@@ -13,7 +13,7 @@ from app.modules.identity.api.routes import me_router
 from app.modules.identity.api.routes import router as auth_router
 from app.modules.identity.application.profile import UserRatePreference
 from app.modules.identity.infrastructure.persistence import SqlAlchemyIdentityUnitOfWork
-from app.modules.investments.api.routes import positions_router, trades_router
+from app.modules.investments.api.routes import positions_router, prices_router, trades_router
 from app.modules.investments.api.routes import router as instruments_router
 from app.modules.ledger.api.accounts import router as accounts_router
 from app.modules.ledger.api.routes import router as categories_router
@@ -66,6 +66,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(instruments_router)
     app.include_router(trades_router)
     app.include_router(positions_router)
+    app.include_router(prices_router)
     return app
 
 
