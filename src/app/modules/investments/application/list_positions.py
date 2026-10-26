@@ -39,6 +39,7 @@ class ListPositions:
             instruments = {i.id: i for i in await self.uow.instruments.list_instruments()}
             trades = await self.uow.trades.list_trades()
             prices = await self.uow.prices.latest_prices()
+            events = await self.uow.events.list_events()
         at = datetime.now(UTC)
 
         async def convert(position: Position, target: Currency) -> Decimal:
@@ -48,6 +49,6 @@ class ListPositions:
 
         valued = [
             ValuedPosition(p, await convert(p, Currency.ARS), await convert(p, Currency.USD))
-            for p in build_positions(trades, instruments, prices)
+            for p in build_positions(trades, instruments, prices, events)
         ]
         return rate_type, valued

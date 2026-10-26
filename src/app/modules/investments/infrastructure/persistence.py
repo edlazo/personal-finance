@@ -23,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.modules.investments.domain.event import EventKind, InstrumentEvent
 from app.modules.investments.domain.instrument import (
     Instrument,
     InstrumentTickerTakenError,
@@ -81,6 +82,20 @@ class InstrumentPriceModel(UserOwnedMixin, Base):
     source: Mapped[PriceSource] = mapped_column(
         Enum(PriceSource, name="price_source", native_enum=False, length=10)
     )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class InstrumentEventModel(UserOwnedMixin, Base):
+    __tablename__ = "instrument_events"
+
+    account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.id"), index=True)
+    instrument_id: Mapped[UUID] = mapped_column(ForeignKey("instruments.id"), index=True)
+    kind: Mapped[EventKind] = mapped_column(
+        Enum(EventKind, name="event_kind", native_enum=False, length=12)
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(20, 2))
+    nominal: Mapped[Decimal | None] = mapped_column(Numeric(28, 8))
+    date: Mapped[date] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -217,6 +232,52 @@ class SqlAlchemyPriceRepository(UserScopedRepository[InstrumentPriceModel]):
         }
 
 
+class SqlAlchemyEventRepository(UserScopedRepository[InstrumentEventModel]):
+    model = InstrumentEventModel
+
+    async def add(self, event: InstrumentEvent) -> None:
+        self.session.add(
+            InstrumentEventModel(
+                id=event.id,
+                user_id=event.user_id,
+                account_id=event.account_id,
+                instrument_id=event.instrument_id,
+                kind=event.kind,
+                amount=event.amount,
+                nominal=event.nominal,
+                date=event.date,
+                created_at=event.created_at,
+            )
+        )
+        await self.session.flush()
+
+    async def list_events(self) -> list[InstrumentEvent]:
+        return [
+            InstrumentEvent(
+                id=m.id,
+                user_id=m.user_id,
+                account_id=m.account_id,
+                instrument_id=m.instrument_id,
+                kind=m.kind,
+                amount=m.amount,
+                date=m.date,
+                nominal=m.nominal,
+                created_at=m.created_at,
+            )
+            for m in await self.session.scalars(self.scoped())
+        ]
+
+    async def amortized(self, account_id: UUID, instrument_id: UUID) -> Decimal:
+        m = InstrumentEventModel
+        query = select(func.coalesce(func.sum(m.nominal), 0)).where(
+            m.user_id == self.user_id,
+            m.account_id == account_id,
+            m.instrument_id == instrument_id,
+            m.kind == EventKind.AMORTIZATION,
+        )
+        return Decimal(await self.session.scalar(query) or 0)
+
+
 # Lo arma main.py con la implementación de ledger (contrato de app.shared).
 CashMovementsFactory = Callable[[AsyncSession, UUID], CashMovements]
 
@@ -225,6 +286,7 @@ class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
     instruments: SqlAlchemyInstrumentRepository
     trades: SqlAlchemyTradeRepository
     prices: SqlAlchemyPriceRepository
+    events: SqlAlchemyEventRepository
     cash: CashMovements
 
     def __init__(
@@ -242,6 +304,7 @@ class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
         self.instruments = SqlAlchemyInstrumentRepository(self.session, self._user_id)
         self.trades = SqlAlchemyTradeRepository(self.session, self._user_id)
         self.prices = SqlAlchemyPriceRepository(self.session, self._user_id)
+        self.events = SqlAlchemyEventRepository(self.session, self._user_id)
         # Misma sesión: la operación y el movimiento de ledger se confirman juntos.
         self.cash = self._cash(self.session, self._user_id)
         return self

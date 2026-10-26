@@ -6,6 +6,7 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID
 
+from app.modules.investments.domain.event import InstrumentEvent
 from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
 from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import Trade, TradeSide
@@ -52,6 +53,23 @@ class InMemoryTrades:
             ),
             Decimal("0"),
         )
+
+
+class InMemoryEvents:
+    def __init__(self) -> None:
+        self.items: list[InstrumentEvent] = []
+
+    async def add(self, event: InstrumentEvent) -> None:
+        self.items.append(event)
+
+    async def list_events(self) -> list[InstrumentEvent]:
+        return list(self.items)
+
+    async def amortized(self, account_id: UUID, instrument_id: UUID) -> Decimal:
+        # Solo las amortizaciones tienen valor nominal.
+        key = (account_id, instrument_id)
+        found = [e.nominal for e in self.items if (e.account_id, e.instrument_id) == key]
+        return sum((n for n in found if n is not None), Decimal("0"))
 
 
 class InMemoryPrices:
@@ -139,6 +157,7 @@ class FakeInvestmentsUnitOfWork:
         self.instruments = InMemoryInstruments()
         self.trades = InMemoryTrades()
         self.prices = InMemoryPrices()
+        self.events = InMemoryEvents()
         self.cash = FakeCash()
         self.commits = 0
 
