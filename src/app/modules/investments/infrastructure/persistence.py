@@ -245,3 +245,37 @@ class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
         # Misma sesión: la operación y el movimiento de ledger se confirman juntos.
         self.cash = self._cash(self.session, self._user_id)
         return self
+
+
+class SqlAlchemyCryptoPriceStore:
+    """Para el job de precios: lee los instrumentos cripto de todos los usuarios."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def list_crypto(self) -> list[Instrument]:
+        query = select(InstrumentModel).where(InstrumentModel.type == InstrumentType.CRYPTO)
+        return [_to_domain(model) for model in await self.session.scalars(query)]
+
+    async def add(self, price: InstrumentPrice) -> None:
+        self.session.add(
+            InstrumentPriceModel(
+                id=price.id,
+                user_id=price.user_id,
+                instrument_id=price.instrument_id,
+                price=price.price,
+                date=price.date,
+                source=price.source,
+                created_at=price.created_at,
+            )
+        )
+        await self.session.flush()
+
+
+class SqlAlchemyPriceSyncUnitOfWork(SqlAlchemyUnitOfWork):
+    store: SqlAlchemyCryptoPriceStore
+
+    async def __aenter__(self) -> Self:
+        await super().__aenter__()
+        self.store = SqlAlchemyCryptoPriceStore(self.session)
+        return self

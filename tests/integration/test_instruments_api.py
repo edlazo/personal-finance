@@ -1,14 +1,20 @@
 from collections.abc import Callable, Iterator
+from decimal import Decimal
 from typing import Any
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from pydantic import PostgresDsn
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.config import Settings
 from app.main import create_app
+from app.modules.investments.infrastructure.jobs import sync_crypto_prices
+from app.shared.domain.money import Currency
+from app.shared.infrastructure.database import create_session_factory
 
 pytestmark = pytest.mark.integration
 
@@ -144,3 +150,32 @@ def test_a_manual_price_values_the_position_when_it_is_the_most_recent(
     assert (price.status_code, price.json()["source"], other.status_code) == (201, "MANUAL", 404)
     assert (position["price_source"], position["price_date"]) == ("MANUAL", "2026-10-24")
     assert (position["valuation"], position["unrealized_pnl"]) == ("1300.00", "300.00")
+
+
+class FixedCoinGecko:
+    async def prices(self, tickers: set[str]) -> dict[str, dict[Currency, Decimal]]:
+        return {"BTC": {Currency.USD: Decimal("80000.5")}}
+
+
+async def test_the_hourly_job_prices_crypto_positions(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    auth = sign_up()
+    wallet = client.post(
+        "/accounts",
+        headers=auth,
+        json={"name": "Wallet", "type": "CRYPTO_WALLET", "currency": "USD"},
+    ).json()["id"]
+    btc = create(
+        client, auth, ticker="BTC", name="Bitcoin", type="CRYPTO", market="CRYPTO", currency="USD"
+    ).json()["id"]
+    rate = {"type": "MEP", "buy": "1000", "sell": "1000", "quoted_at": "2026-01-02T12:00:00Z"}
+    client.post("/fx/rates", headers=auth, json=rate)
+    body = {"account_id": wallet, "instrument_id": btc, "side": "BUY", "quantity": "0.5"}
+    client.post("/trades", headers=auth, json=body | {"price": "70000", "date": "2026-10-20"})
+
+    await sync_crypto_prices(create_session_factory(engine), FixedCoinGecko(), ZoneInfo("UTC"))
+
+    [position] = client.get("/positions", headers=auth).json()["positions"]
+    assert (position["price_source"], position["current_price"]) == ("API", "80000.5000000000")
+    assert position["valuation"] == "40000.25"
