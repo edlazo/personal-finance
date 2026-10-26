@@ -122,6 +122,21 @@ class InMemorySnapshots:
     async def list_snapshots(self) -> list[HoldingSnapshot]:
         return list(self.items)
 
+    async def replace(self, snapshots: list[HoldingSnapshot]) -> None:
+        self.items = list(snapshots)
+
+
+class InMemoryBudget:
+    def __init__(self) -> None:
+        self.calls: dict[tuple[Broker, date], int] = {}
+
+    async def spend(self, broker: Broker, month: date, calls: int, limit: int) -> bool:
+        used = self.calls.get((broker, month), 0) + calls
+        if used > limit:
+            return False
+        self.calls[(broker, month)] = used
+        return True
+
 
 class FakeCash:
     """Las cuentas de ledger que ve investments y los movimientos que pidió."""
@@ -185,6 +200,8 @@ class FakeInvestmentsUnitOfWork:
         self.events = InMemoryEvents()
         self.links = InMemoryLinks()
         self.snapshots = InMemorySnapshots()
+        self.credentials = InMemoryCredentials()
+        self.budget = InMemoryBudget()
         self.cash = FakeCash()
         self.commits = 0
 

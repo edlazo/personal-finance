@@ -2,7 +2,7 @@ from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -14,12 +14,19 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.config import Settings
 from app.main import create_app
+from app.modules.investments.application.sync_portfolio import SyncPortfolio
+from app.modules.investments.domain.instrument import InstrumentType, Market
+from app.modules.investments.domain.portfolio import BrokerHolding, CallBudgetExhaustedError
+from app.modules.investments.infrastructure.cipher import FernetCipher
 from app.modules.investments.infrastructure.credentials import (
     BrokerCredentialsModel,
     HoldingSnapshotModel,
 )
 from app.modules.investments.infrastructure.jobs import sync_crypto_prices
-from app.modules.investments.infrastructure.persistence import InstrumentModel
+from app.modules.investments.infrastructure.persistence import (
+    InstrumentModel,
+    SqlAlchemyInvestmentsUnitOfWork,
+)
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import create_session_factory
 
@@ -340,3 +347,40 @@ async def test_the_linked_account_shows_the_saved_portfolio_snapshot(
     assert (position["price_source"], position["price_date"]) == ("IOL", "2026-10-26")
     assert (position["cost"], position["valuation"]) == ("60000.00", "65000.00")
     assert others == []
+
+
+async def test_the_iol_sync_saves_the_snapshot_within_the_monthly_limit(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    auth = sign_up()
+    body = {"name": "IOL", "type": "BROKER", "currency": "ARS", "initial_balance": "0"}
+    iol = client.post("/accounts", headers=auth, json=body).json()["id"]
+    client.put("/brokers/IOL/account", headers=auth, json={"account_id": iol})
+    login = {"username": "elias", "password": "clave"}
+    client.put("/brokers/IOL/credentials", headers=auth, json=login)
+    user_id = UUID(client.get("/me", headers=auth).json()["id"])
+    state = client.app.state  # type: ignore[attr-defined]
+    cipher = FernetCipher(state.settings.credentials_key.get_secret_value())
+    uow = SqlAlchemyInvestmentsUnitOfWork(
+        create_session_factory(engine), user_id, state.cash_movements
+    )
+    sync = SyncPortfolio(uow, FixedIol(), cipher, monthly_limit=3)
+
+    saved = await sync(user_id, datetime(2026, 10, 26, 15, tzinfo=UTC))
+    with pytest.raises(CallBudgetExhaustedError):
+        await sync(user_id, datetime(2026, 10, 26, 16, tzinfo=UTC))
+
+    rate = {"type": "MEP", "buy": "1000", "sell": "1000", "quoted_at": "2026-01-02T12:00:00Z"}
+    client.post("/fx/rates", headers=auth, json=rate)
+    [position] = client.get("/positions", headers=auth).json()["positions"]
+    assert saved == 1
+    assert (position["instrument"]["ticker"], position["price_source"]) == ("GGAL", "IOL")
+    assert position["valuation"] == "65000.00"
+
+
+class FixedIol:
+    async def portfolio(self, username: str, password: str) -> list[BrokerHolding]:
+        assert (username, password) == ("elias", "clave")
+        amounts = (Decimal("10"), Decimal("6000"), Decimal("6500"))
+        stock, ars = InstrumentType.STOCK, Currency.ARS
+        return [BrokerHolding("GGAL", "Galicia", stock, Market.BYMA, ars, *amounts)]

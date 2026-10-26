@@ -1,13 +1,15 @@
 """Tabla y repositorio de las credenciales cifradas de brokers."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    Date,
     DateTime,
     Enum,
     ForeignKey,
+    Integer,
     LargeBinary,
     Numeric,
     String,
@@ -132,3 +134,52 @@ class SqlAlchemySnapshotRepository(UserScopedRepository[HoldingSnapshotModel]):
             )
             for m in await self.session.scalars(self.scoped())
         ]
+
+    async def replace(self, snapshots: list[HoldingSnapshot]) -> None:
+        m = HoldingSnapshotModel
+        await self.session.execute(delete(m).where(m.user_id == self.user_id))
+        self.session.add_all(
+            m(
+                id=s.id,
+                user_id=self.user_id,
+                account_id=s.account_id,
+                instrument_id=s.instrument_id,
+                quantity=s.quantity,
+                average_price=s.average_price,
+                last_price=s.last_price,
+                taken_at=s.taken_at,
+            )
+            for s in snapshots
+        )
+        await self.session.flush()
+
+
+class BrokerCallsModel(UserOwnedMixin, Base):
+    """Llamadas hechas a la API del broker en el mes, contra el cupo de las credenciales."""
+
+    __tablename__ = "broker_calls"
+    __table_args__ = (UniqueConstraint("user_id", "broker", "month"),)
+
+    broker: Mapped[Broker] = mapped_column(
+        Enum(Broker, name="broker", native_enum=False, length=10)
+    )
+    # Primer día del mes.
+    month: Mapped[date] = mapped_column(Date)
+    calls: Mapped[int] = mapped_column(Integer)
+
+
+class SqlAlchemyCallBudgetRepository(UserScopedRepository[BrokerCallsModel]):
+    model = BrokerCallsModel
+
+    async def spend(self, broker: Broker, month: date, calls: int, limit: int) -> bool:
+        m = BrokerCallsModel
+        # Suma y control en una sola sentencia: dos sincronizaciones a la vez no pasan el tope.
+        upsert = insert(m).values(
+            id=uuid4(), user_id=self.user_id, broker=broker, month=month, calls=calls
+        )
+        upsert = upsert.on_conflict_do_update(
+            index_elements=["user_id", "broker", "month"],
+            set_={"calls": m.calls + calls},
+            where=m.calls + calls <= limit,
+        )
+        return await self.session.scalar(upsert.returning(m.calls)) is not None
