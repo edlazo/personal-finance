@@ -1,13 +1,24 @@
 """Tabla y repositorio de las credenciales cifradas de brokers."""
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, ForeignKey, LargeBinary, String, UniqueConstraint, delete
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    LargeBinary,
+    Numeric,
+    String,
+    UniqueConstraint,
+    delete,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.modules.investments.domain.credentials import Broker, BrokerCredentials, BrokerLink
+from app.modules.investments.domain.portfolio import HoldingSnapshot
 from app.shared.infrastructure.database import Base
 from app.shared.infrastructure.user_scoped import UserOwnedMixin, UserScopedRepository
 
@@ -89,3 +100,35 @@ class SqlAlchemyBrokerLinkRepository(UserScopedRepository[BrokerLinkModel]):
         query = self.scoped().where(BrokerLinkModel.account_id == account_id)
         found = await self.session.scalar(query)
         return None if found is None else found.broker
+
+
+class HoldingSnapshotModel(UserOwnedMixin, Base):
+    __tablename__ = "holding_snapshots"
+
+    account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.id"), index=True)
+    instrument_id: Mapped[UUID] = mapped_column(ForeignKey("instruments.id"))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(28, 8))
+    average_price: Mapped[Decimal] = mapped_column(Numeric(28, 10))
+    last_price: Mapped[Decimal] = mapped_column(Numeric(28, 10))
+    taken_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SqlAlchemySnapshotRepository(UserScopedRepository[HoldingSnapshotModel]):
+    """Cada sincronización reemplaza la foto de la cuenta: acá siempre está la última."""
+
+    model = HoldingSnapshotModel
+
+    async def list_snapshots(self) -> list[HoldingSnapshot]:
+        return [
+            HoldingSnapshot(
+                m.user_id,
+                m.account_id,
+                m.instrument_id,
+                m.quantity,
+                m.average_price,
+                m.last_price,
+                m.taken_at,
+                m.id,
+            )
+            for m in await self.session.scalars(self.scoped())
+        ]

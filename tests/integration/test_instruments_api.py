@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
@@ -8,13 +9,17 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from pydantic import PostgresDsn
-from sqlalchemy import select
+from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.config import Settings
 from app.main import create_app
-from app.modules.investments.infrastructure.credentials import BrokerCredentialsModel
+from app.modules.investments.infrastructure.credentials import (
+    BrokerCredentialsModel,
+    HoldingSnapshotModel,
+)
 from app.modules.investments.infrastructure.jobs import sync_crypto_prices
+from app.modules.investments.infrastructure.persistence import InstrumentModel
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import create_session_factory
 
@@ -302,3 +307,36 @@ def test_linking_a_broker_account_blocks_manual_trades(
     assert (status["linked_account_id"], status["configured"]) == (iol, False)
     assert trade.status_code == 422
     assert "vinculada a IOL" in trade.json()["detail"]
+
+
+async def test_the_linked_account_shows_the_saved_portfolio_snapshot(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    auth = sign_up()
+    body = {"name": "IOL", "type": "BROKER", "currency": "ARS", "initial_balance": "0"}
+    iol = client.post("/accounts", headers=auth, json=body).json()["id"]
+    ggal = create(client, auth, ticker="GGAL", name="Galicia", type="STOCK").json()["id"]
+    rate = {"type": "MEP", "buy": "1000", "sell": "1000", "quoted_at": "2026-01-02T12:00:00Z"}
+    client.post("/fx/rates", headers=auth, json=rate)
+    client.put("/brokers/IOL/account", headers=auth, json={"account_id": iol})
+    snapshot = {
+        "account_id": iol,
+        "instrument_id": ggal,
+        "quantity": Decimal("10"),
+        "average_price": Decimal("6000"),
+        "last_price": Decimal("6500"),
+        "taken_at": datetime(2026, 10, 26, 15, tzinfo=UTC),
+    }
+    async with engine.begin() as connection:
+        owner = select(InstrumentModel.user_id).where(InstrumentModel.id == ggal)
+        user_id = (await connection.execute(owner)).scalar_one()
+        await connection.execute(
+            insert(HoldingSnapshotModel).values(snapshot | {"id": uuid4(), "user_id": user_id})
+        )
+
+    [position] = client.get("/positions", headers=auth).json()["positions"]
+    others = client.get("/positions", headers=sign_up()).json()["positions"]
+
+    assert (position["price_source"], position["price_date"]) == ("IOL", "2026-10-26")
+    assert (position["cost"], position["valuation"]) == ("60000.00", "65000.00")
+    assert others == []
