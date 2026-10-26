@@ -1,10 +1,12 @@
 """Dobles en memoria para los casos de uso del ledger."""
 
+from datetime import date
+from decimal import Decimal
 from types import TracebackType
 from typing import Self
 from uuid import UUID
 
-from app.modules.ledger.domain.category import Category
+from app.modules.ledger.domain.category import Category, CategoryKind
 from app.modules.ledger.domain.transaction import Transaction, TransactionFilter
 from app.shared.domain.errors import NotFoundError
 from fakes.accounts import InMemoryAccounts
@@ -86,6 +88,14 @@ class InMemoryTransactions:
     async def delete(self, transaction_id: UUID) -> None:
         self.items = [t for t in self.items if t.id != transaction_id]
 
+    async def daily_totals(self, account_id: UUID) -> dict[date, Decimal]:
+        totals: dict[date, Decimal] = {}
+        for t in self.items:
+            if t.account_id == account_id:
+                signed = t.amount if t.kind is CategoryKind.INCOME else -t.amount
+                totals[t.date] = totals.get(t.date, Decimal("0")) + signed
+        return totals
+
 
 class FakeLedgerUnitOfWork:
     def __init__(self) -> None:
@@ -93,8 +103,10 @@ class FakeLedgerUnitOfWork:
         self.categories = InMemoryCategories()
         self.transactions = InMemoryTransactions()
         self.commits = 0
+        self._saved: list[Transaction] = []
 
     async def __aenter__(self) -> Self:
+        self._saved = list(self.transactions.items)
         return self
 
     async def __aexit__(
@@ -103,7 +115,9 @@ class FakeLedgerUnitOfWork:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
-        pass
+        # Como la base: si algo falla, los movimientos vuelven a como estaban.
+        if exc is not None:
+            self.transactions.items = self._saved
 
     async def commit(self) -> None:
         self.commits += 1

@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+from app.modules.ledger.application.balance_guard import ensure_non_negative
 from app.modules.ledger.application.create_transaction import TransactionsUnitOfWork
 from app.modules.ledger.application.list_categories import ensure_default_categories
 from app.modules.ledger.domain.account import Account
@@ -39,6 +40,8 @@ class CreateTransfer:
             await self.uow.transactions.add(result.incoming)
             if fee is not None:
                 result = replace(result, fee=await self._charge_fee(user_id, source, fee, on))
+            # Solo el origen puede bajar: el destino recibe.
+            await ensure_non_negative(self.uow, {source_id: on})
             await self.uow.commit()
         return result
 

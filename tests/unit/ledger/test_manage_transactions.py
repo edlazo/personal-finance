@@ -26,7 +26,7 @@ def uow() -> FakeLedgerUnitOfWork:
 
 
 def account(uow: FakeLedgerUnitOfWork, name: str = "Galicia") -> Account:
-    created = Account(USER, name, AccountType.SAVINGS, Currency.ARS, Decimal("0"))
+    created = Account(USER, name, AccountType.SAVINGS, Currency.ARS, Decimal("1000000"))
     uow.accounts.items[created.id] = created
     return created
 

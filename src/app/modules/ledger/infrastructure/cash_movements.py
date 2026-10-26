@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.ledger.domain.account import check_non_negative
 from app.modules.ledger.domain.category import Category, CategoryKind, default_categories
 from app.modules.ledger.domain.transaction import Transaction
 from app.modules.ledger.infrastructure.accounts import SqlAlchemyAccountRepository
@@ -46,6 +47,10 @@ class LedgerCashMovements:
             self.user_id, account_id, kind, amount, on, None, description, trade_id=trade_id
         )
         await self.transactions.add(movement)
+        if not incoming:
+            # Una compra tampoco puede dejar en negativo una wallet (decisión del PO, US-062).
+            account = await self.accounts.get_account(account_id)
+            check_non_negative(account, await self.transactions.daily_totals(account_id), on)
 
     async def record_income(
         self, account_id: UUID, amount: Decimal, *, on: date, trade_id: UUID, description: str

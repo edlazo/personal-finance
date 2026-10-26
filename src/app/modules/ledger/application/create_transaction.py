@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from app.modules.ledger.application.balance_guard import ensure_non_negative
 from app.modules.ledger.application.list_categories import LedgerUnitOfWork
 from app.modules.ledger.domain.account import AccountRepository
 from app.modules.ledger.domain.category import CategoryKind
@@ -55,5 +56,6 @@ class CreateTransaction:
             category = await self.uow.categories.get_category(category_id)
             check_movement(kind, account, category)
             await self.uow.transactions.add(transaction)
+            await ensure_non_negative(self.uow, {account_id: on})
             await self.uow.commit()
         return transaction

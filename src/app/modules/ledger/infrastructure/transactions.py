@@ -13,6 +13,7 @@ from sqlalchemy import (
     Index,
     Numeric,
     String,
+    case,
     delete,
     func,
     select,
@@ -126,6 +127,16 @@ class SqlAlchemyTransactionRepository(UserScopedRepository[TransactionModel]):
                 TransactionModel.id == transaction_id, TransactionModel.user_id == self.user_id
             )
         )
+
+    async def daily_totals(self, account_id: UUID) -> dict[date, Decimal]:
+        m = TransactionModel
+        signed = case((m.kind == CategoryKind.INCOME, m.amount), else_=-m.amount)
+        query = (
+            select(m.date, func.sum(signed))
+            .where(m.user_id == self.user_id, m.account_id == account_id)
+            .group_by(m.date)
+        )
+        return dict((await self.session.execute(query)).all())
 
 
 def _to_domain(model: TransactionModel) -> Transaction:

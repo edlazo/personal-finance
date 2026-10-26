@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+from app.modules.ledger.application.balance_guard import ensure_non_negative
 from app.modules.ledger.application.create_transaction import TransactionsUnitOfWork
 from app.modules.ledger.domain.account import AccountArchivedError
 from app.modules.ledger.domain.category import CategoryKind
@@ -84,6 +85,12 @@ class UpdateTransaction:
                 check_movement(movement.kind, account, category)
             for leg in edited:
                 await self.uow.transactions.save(leg)
+            touched: dict[UUID, date] = {}
+            for before, after in zip(legs, edited, strict=True):
+                for account_id in (before.account_id, after.account_id):
+                    since = min(before.date, after.date, touched.get(account_id, after.date))
+                    touched[account_id] = since
+            await ensure_non_negative(self.uow, touched)
             await self.uow.commit()
         return next(leg for leg in edited if leg.id == transaction_id)
 
@@ -94,6 +101,9 @@ class DeleteTransaction:
 
     async def __call__(self, transaction_id: UUID) -> None:
         async with self.uow:
-            for leg in await _editable_legs(self.uow, transaction_id):
+            legs = await _editable_legs(self.uow, transaction_id)
+            for leg in legs:
                 await self.uow.transactions.delete(leg.id)
+            # Borrar un ingreso (o la pata que entra de una transferencia) puede dejar negativo.
+            await ensure_non_negative(self.uow, {leg.account_id: leg.date for leg in legs})
             await self.uow.commit()
