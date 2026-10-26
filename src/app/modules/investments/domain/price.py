@@ -7,11 +7,14 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from app.modules.investments.domain.instrument import Instrument
 from app.modules.investments.domain.trade import PRICE_PRECISION, InvalidTradeError
+from app.shared.domain.money import Currency
 
 
 class PriceSource(StrEnum):
     MANUAL = "MANUAL"
+    API = "API"
 
 
 @dataclass
@@ -37,3 +40,17 @@ class PriceRepository(Protocol):
     async def latest_prices(self) -> dict[UUID, InstrumentPrice]:
         """El precio más reciente de cada instrumento, por fecha y después por carga."""
         ...
+
+
+class PriceProvider(Protocol):
+    async def prices(self, tickers: set[str]) -> dict[str, dict[Currency, Decimal]]:
+        """Precio actual de cada ticker en las monedas que haya; los desconocidos no vienen."""
+        ...
+
+
+class CryptoPriceStore(Protocol):
+    """Para el job: ve los instrumentos cripto de todos los usuarios."""
+
+    async def list_crypto(self) -> list[Instrument]: ...
+
+    async def add(self, price: InstrumentPrice) -> None: ...
