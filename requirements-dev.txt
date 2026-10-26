@@ -16,4 +16,4 @@ pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 testcontainers[postgres]==4.15.0
 # Los adaptadores HTTP se testean con httpx2.MockTransport (respx solo soporta httpx).
-polyfactory==3.3.0
+polyfactory==3.5.0
