@@ -86,6 +86,7 @@ class FakeCash:
     def __init__(self) -> None:
         self.accounts: dict[UUID, CashAccount] = {}
         self.recorded: list[tuple[UUID, Decimal, bool]] = []
+        self.incomes: list[tuple[UUID, Decimal]] = []
 
     async def account(self, account_id: UUID) -> CashAccount:
         if account_id not in self.accounts:
@@ -103,6 +104,11 @@ class FakeCash:
         description: str,
     ) -> None:
         self.recorded.append((account_id, amount, incoming))
+
+    async def record_income(
+        self, account_id: UUID, amount: Decimal, *, on: date, trade_id: UUID, description: str
+    ) -> None:
+        self.incomes.append((account_id, amount))
 
 
 class FakePriceSyncUnitOfWork:

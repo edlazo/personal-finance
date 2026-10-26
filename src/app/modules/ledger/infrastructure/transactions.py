@@ -31,10 +31,10 @@ class TransactionModel(UserOwnedMixin, Base):
     # El listado (PF-34) filtra por usuario y ordena por fecha.
     __table_args__ = (
         Index("ix_transactions_user_id_date", "user_id", "date"),
-        # Con categoría (ingreso o gasto), pata de una transferencia o de una operación: una sola.
+        # Pata de una transferencia (solo eso) o movimiento con categoría y/o ligado a inversiones.
         CheckConstraint(
-            "num_nonnulls(category_id, transfer_group_id, trade_id) = 1",
-            name="category_transfer_or_trade",
+            "(transfer_group_id IS NOT NULL) <> (num_nonnulls(category_id, trade_id) > 0)",
+            name="movement_links",
         ),
     )
 

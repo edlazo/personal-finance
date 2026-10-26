@@ -131,4 +131,15 @@ async def test_movements_of_an_investment_trade_are_read_only(uow: FakeLedgerUni
     with pytest.raises(InvalidTransactionError, match="operación de inversión"):
         await DeleteTransaction(uow=uow)(movement.id)
     with pytest.raises(InvalidTransactionError, match="categoría o es parte de"):
-        Transaction(USER, galicia.id, EXPENSE, Decimal("1.00"), DAY, uuid4(), trade_id=uuid4())
+        Transaction(
+            USER,
+            galicia.id,
+            EXPENSE,
+            Decimal("1.00"),
+            DAY,
+            None,
+            transfer_group_id=uuid4(),
+            trade_id=uuid4(),
+        )
+    # Un dividendo o cupón: ingreso con categoría y ligado al evento de inversión.
+    Transaction(USER, galicia.id, INCOME, Decimal("1.00"), DAY, uuid4(), trade_id=uuid4())

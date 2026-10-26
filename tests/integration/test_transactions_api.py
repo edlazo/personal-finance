@@ -282,3 +282,43 @@ async def test_other_modules_move_cash_through_ledger(
         patch.status_code,
         client.delete(f"/transactions/{movement['id']}", headers=auth).status_code,
     ) == (422, 422)
+
+
+async def test_income_from_investments_lands_in_rentas_and_is_read_only(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    auth = sign_up()
+    user_id = UUID(client.get("/me", headers=auth).json()["id"])
+    broker = client.post(
+        "/accounts", headers=auth, json={"name": "IOL", "type": "BROKER", "currency": "ARS"}
+    ).json()["id"]
+
+    async with create_session_factory(engine)() as session:
+        # Usuario nuevo: todavía no tiene categorías, se crean las por defecto en el primer uso.
+        await LedgerCashMovements(session, user_id).record_income(
+            UUID(broker),
+            Decimal("250.00"),
+            on=date(2026, 10, 24),
+            trade_id=uuid4(),
+            description="Dividendo GGAL",
+        )
+        await session.commit()
+
+    [movement] = client.get("/transactions", headers=auth).json()["items"]
+    categories = {c["id"]: c for c in client.get("/categories", headers=auth).json()}
+    rentas = categories[movement["category_id"]]
+    assert (rentas["name"], rentas["kind"], movement["kind"]) == ("Rentas", "INCOME", "INCOME")
+    assert (len(categories), movement["trade_id"] is not None) == (14, True)
+    assert client.delete(f"/transactions/{movement['id']}", headers=auth).status_code == 422
+    client.delete(f"/categories/{rentas['id']}", headers=auth)
+    async with create_session_factory(engine)() as session:
+        await LedgerCashMovements(session, user_id).record_income(
+            UUID(broker),
+            Decimal("10.00"),
+            on=date(2026, 10, 25),
+            trade_id=uuid4(),
+            description="Cupón AL30",
+        )
+        await session.commit()
+    newest = client.get("/transactions", headers=auth).json()["items"][0]
+    assert newest["category_id"] != rentas["id"]

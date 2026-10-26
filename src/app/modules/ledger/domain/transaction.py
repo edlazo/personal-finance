@@ -20,8 +20,9 @@ class InvalidTransactionError(DomainError):
 class Transaction:
     """El monto siempre es positivo; `kind` define si suma (ingreso) o resta (gasto).
 
-    Una transferencia son dos movimientos sin categoría ligados por `transfer_group_id`; una
-    operación de inversión, uno sin categoría ligado por `trade_id`.
+    Una transferencia son dos movimientos sin categoría ligados por `transfer_group_id`. Una
+    operación de inversión es uno sin categoría ligado por `trade_id`; un dividendo o cupón, un
+    ingreso en "Rentas" ligado también por `trade_id` (el id del evento).
     """
 
     user_id: UUID
@@ -41,8 +42,9 @@ class Transaction:
             raise InvalidTransactionError("El monto tiene que ser mayor a cero")
         if self.amount != self.amount.quantize(CENTS):
             raise InvalidTransactionError("El monto admite hasta 2 decimales")
-        links = (self.category_id, self.transfer_group_id, self.trade_id)
-        if sum(link is not None for link in links) != 1:
+        transfer = self.transfer_group_id is not None
+        other = self.category_id is not None or self.trade_id is not None
+        if transfer == other:
             raise InvalidTransactionError(
                 "Un movimiento lleva categoría o es parte de una transferencia o de una operación"
             )

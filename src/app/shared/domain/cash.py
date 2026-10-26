@@ -37,3 +37,9 @@ class CashMovements(Protocol):
     ) -> None:
         """Movimiento sin categoría ligado a la operación; no cuenta como ingreso ni gasto."""
         ...
+
+    async def record_income(
+        self, account_id: UUID, amount: Decimal, *, on: date, trade_id: UUID, description: str
+    ) -> None:
+        """Ingreso en la categoría "Rentas" ligado al evento (dividendo o cupón)."""
+        ...
