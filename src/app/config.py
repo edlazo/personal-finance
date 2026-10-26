@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     # Portafolio de IOL (PF-51). IOL cobra desde 25.000 llamadas por mes: se corta al 80 %.
     iol_url: str = "https://api.invertironline.com"
     iol_monthly_calls: int = 20_000
+    # Precios de BYMA y EE.UU. (PF-52), días hábiles cada 30 min como IOL.
+    data912_url: str = "https://data912.com"
 
     @model_validator(mode="after")
     def _require_real_secret_in_production(self) -> Self:

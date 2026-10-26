@@ -17,6 +17,7 @@ from app.config import get_settings
 from app.modules.fx.infrastructure.dolarapi import DolarApiProvider
 from app.modules.fx.infrastructure.jobs import schedule_fx_jobs
 from app.modules.investments.infrastructure.coingecko import CoinGeckoProvider
+from app.modules.investments.infrastructure.data912 import Data912Provider
 from app.modules.investments.infrastructure.iol import IolClient
 from app.modules.investments.infrastructure.jobs import schedule_investment_jobs
 from app.modules.ledger.infrastructure.cash_movements import LedgerCashMovements
@@ -45,7 +46,13 @@ async def run(stop: asyncio.Event) -> None:
         )
         iol = IolClient(client, settings.iol_url)
         schedule_investment_jobs(
-            scheduler, settings, session_factory, coingecko, iol, LedgerCashMovements
+            scheduler,
+            settings,
+            session_factory,
+            coingecko,
+            iol,
+            LedgerCashMovements,
+            Data912Provider(client, settings.data912_url),
         )
         scheduler.start()
         logger.info("worker_started")

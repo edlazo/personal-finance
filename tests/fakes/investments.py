@@ -10,7 +10,7 @@ from app.modules.investments.domain.credentials import Broker, BrokerCredentials
 from app.modules.investments.domain.event import InstrumentEvent
 from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
 from app.modules.investments.domain.portfolio import HoldingSnapshot
-from app.modules.investments.domain.price import InstrumentPrice
+from app.modules.investments.domain.price import InstrumentPrice, PriceSource
 from app.modules.investments.domain.trade import Trade, TradeSide
 from app.shared.domain.cash import CashAccount
 from app.shared.domain.errors import NotFoundError
@@ -83,7 +83,11 @@ class InMemoryPrices:
 
     async def latest_prices(self) -> dict[UUID, InstrumentPrice]:
         latest: dict[UUID, InstrumentPrice] = {}
-        for price in sorted(self.items, key=lambda p: (p.date, p.created_at)):
+        # El automático gana al manual (decisión del PO); después, fecha y carga.
+        ranked = sorted(
+            self.items, key=lambda p: (p.source is PriceSource.API, p.date, p.created_at)
+        )
+        for price in ranked:
             latest[price.instrument_id] = price
         return latest
 
@@ -95,6 +99,9 @@ class InMemoryCryptoStore:
 
     async def list_crypto(self) -> list[Instrument]:
         return [i for i in self.instruments if i.type is InstrumentType.CRYPTO]
+
+    async def list_listed(self) -> list[Instrument]:
+        return [i for i in self.instruments if i.market is not Market.CRYPTO]
 
     async def add(self, price: InstrumentPrice) -> None:
         self.prices.append(price)
