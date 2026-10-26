@@ -17,7 +17,7 @@
 | **PF-E3** Movimientos | Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD). | 9 | 23 |
 | **PF-E4** Cotizaciones | Cotizaciones MEP/oficial/blue/CCL/cripto automáticas y manuales; conversión ARS<->USD. | 5 | 15 |
 | **PF-E5** Inversiones | Instrumentos (acciones, CEDEARs, bonos, ETFs, ONs, cripto), operaciones, posiciones y P&L. | 5 | 19 |
-| **PF-E6** Integraciones de mercado | Precios desde IOL, data912 y CoinGecko; importación de Balanz. | 6 | 20 |
+| **PF-E6** Integraciones de mercado | Precios desde IOL, data912 y CoinGecko. | 5 | 15 |
 | **PF-E7** Tarjetas de crédito | Tarjetas, ciclos de resumen, compras en cuotas y pagos. | 4 | 13 |
 | **PF-E8** Deudas | Préstamos y deudas con cronograma de pagos. | 2 | 8 |
 | **PF-E9** Planificación | Movimientos recurrentes y presupuestos mensuales por categoría. | 4 | 12 |
@@ -404,17 +404,17 @@ _Instrumentos (acciones, CEDEARs, bonos, ETFs, ONs, cripto), operaciones, posici
 
 ## PF-E6 - Integraciones de mercado
 
-_Precios desde IOL, data912 y CoinGecko; importación de Balanz._
+_Precios desde IOL, data912 y CoinGecko. Balanz quedó fuera en la Review del Sprint 7._
 
-### US-031 - Investigar API de IOL y exportación de Balanz
+### US-031 - Investigar API de IOL
 `Spike` | **2 SP** | Prioridad **High** | Sprint 7 | label `integrations`
 
 **Como** equipo, **quiero** conocer endpoints, límites y formatos, **para** estimar con precisión las integraciones.
 
 **Criterios de aceptación**
 - [ ] Documento con endpoints de IOL (auth, cotizaciones, portafolio), límites y requisitos de habilitación
-- [ ] Ejemplo anonimizado del archivo exportado de Balanz y mapeo de columnas
-- [ ] Decisión sobre openpyxl vs alternativa para leer Excel
+- [ ] Confirmar cómo cuenta IOL el límite de 25.000 llamadas por mes (por cuenta, si la autenticación suma, qué pasa al pasarlo) y si hay un endpoint que traiga varias cotizaciones en una sola llamada
+- [ ] Presupuesto de llamadas por mes para la frecuencia propuesta, con margen
 
 ### US-032 - Credenciales de broker cifradas
 `Story` | **3 SP** | Prioridad **High** | Sprint 7 | label `integrations`
@@ -444,6 +444,8 @@ _Precios desde IOL, data912 y CoinGecko; importación de Balanz._
 - [ ] Adaptador `IolPriceProvider` con OAuth2 password grant y refresh de token
 - [ ] Job que actualiza precios de instrumentos en cartera
 - [ ] Errores de autenticación se notifican sin romper el job
+- [ ] **Límite de IOL: 25.000 llamadas por mes; pasarlo se cobra.** Contador mensual persistido de todas las llamadas (autenticación incluida); al llegar al presupuesto configurable (por defecto 20.000, el 80 %) el job deja de llamar a IOL hasta el mes siguiente y lo loguea
+- [ ] Frecuencia y cantidad de instrumentos calculadas para quedar dentro del presupuesto
 
 ### US-034 - Precios de respaldo desde data912
 `Story` | **3 SP** | Prioridad **Medium** | Sprint 8 | label `integrations`
@@ -455,7 +457,9 @@ _Precios desde IOL, data912 y CoinGecko; importación de Balanz._
 - [ ] Estrategia de proveedores configurable por prioridad (IOL > data912 > manual)
 
 ### US-036 - Importar movimientos de Balanz
-`Story` | **5 SP** | Prioridad **Medium** | Sprint 8 | label `integrations`
+`Story` | **5 SP** | Prioridad **Medium** | Descartada | label `integrations`
+
+_Descartada en la Review del Sprint 7: el PO decidió no usar Balanz, solo IOL._
 
 **Como** inversor de Balanz, **quiero** subir el archivo exportado de Balanz, **para** no cargar mis operaciones a mano.
 

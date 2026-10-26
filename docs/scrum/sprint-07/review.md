@@ -26,6 +26,7 @@
 ## Cambios al Product Backlog
 - **Decisiones del PO aplicadas:** la comisión es un gasto aparte en el origen; "Comisiones" se suma a las categorías por defecto; al editar una compra de USD cambia solo la pata editada; el catálogo de instrumentos es de cada usuario; las operaciones mueven la cuenta con un movimiento ligado (`trade_id`) por un contrato en `app.shared`; tenencia y posiciones por cuenta; misma moneda entre cuenta e instrumento; precio actual = última operación hasta US-029; las comisiones entran en costo y resultado.
 - **Sprint 8:** suma PF-86 (US-062, saldo no negativo) y queda en 16 SP.
+- **Balanz:** queda fuera, solo se integra IOL (decisión del PO). US-036 (PF-53) se descarta y el spike PF-48 queda solo para IOL.
 - **v0.1.1:** no se publica; el fix del worker sale con la v0.2.0 (decisión del PO).
 
 ## Release
