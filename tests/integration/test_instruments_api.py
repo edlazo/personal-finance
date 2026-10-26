@@ -8,10 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
 from pydantic import PostgresDsn
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.config import Settings
 from app.main import create_app
+from app.modules.investments.infrastructure.credentials import BrokerCredentialsModel
 from app.modules.investments.infrastructure.jobs import sync_crypto_prices
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import create_session_factory
@@ -245,3 +247,31 @@ def test_a_purchase_cannot_leave_a_crypto_wallet_negative(
 
     assert too_much.status_code == 422
     assert client.get(f"/accounts/{wallet}", headers=auth).json()["balance"] == "100.00"
+
+
+async def test_broker_credentials_are_stored_encrypted_and_never_returned(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    ana, beto = sign_up(), sign_up()
+    secret_password = f"clave-iol-{uuid4().hex}"
+    url = "/brokers/IOL/credentials"
+
+    saved = client.put(url, headers=ana, json={"username": "elias", "password": secret_password})
+    status = client.get(url, headers=ana)
+    others = client.get(url, headers=beto).json()
+    async with engine.connect() as connection:
+        rows = (await connection.execute(select(BrokerCredentialsModel.secret))).scalars().all()
+
+    assert (saved.status_code, saved.content) == (204, b"")
+    assert (status.json()["configured"], status.json()["username_hint"]) == (True, "el***")
+    assert secret_password not in status.text
+    assert others == {"configured": False, "username_hint": None, "updated_at": None}
+    assert all(secret_password.encode() not in row for row in rows)
+    assert (
+        client.delete(url, headers=ana).status_code
+        == client.delete(url, headers=ana).status_code
+        == 204
+    )
+    assert client.get(url, headers=ana).json()["configured"] is False
+    assert client.put(url, json={"username": "x", "password": "y"}).status_code == 401
+    assert client.get("/brokers/BALANZ/credentials", headers=ana).status_code == 422

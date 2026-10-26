@@ -14,6 +14,7 @@ from app.modules.identity.api.routes import router as auth_router
 from app.modules.identity.application.profile import UserRatePreference
 from app.modules.identity.infrastructure.persistence import SqlAlchemyIdentityUnitOfWork
 from app.modules.investments.api.routes import (
+    brokers_router,
     events_router,
     positions_router,
     prices_router,
@@ -73,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(positions_router)
     app.include_router(prices_router)
     app.include_router(events_router)
+    app.include_router(brokers_router)
     return app
 
 

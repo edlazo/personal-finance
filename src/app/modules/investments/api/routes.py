@@ -6,10 +6,15 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.investments.application.list_positions import ListPositions
+from app.modules.investments.application.manage_credentials import (
+    CredentialsStatus,
+    DeleteCredentials,
+    SaveCredentials,
+)
 from app.modules.investments.application.manage_instruments import (
     CreateInstrument,
     ListInstruments,
@@ -17,9 +22,11 @@ from app.modules.investments.application.manage_instruments import (
 from app.modules.investments.application.register_event import RegisterEvent
 from app.modules.investments.application.register_price import RegisterPrice
 from app.modules.investments.application.register_trade import RegisterTrade
+from app.modules.investments.domain.credentials import Broker
 from app.modules.investments.domain.event import EventKind
 from app.modules.investments.domain.instrument import InstrumentType, Market
 from app.modules.investments.domain.trade import TradeSide
+from app.modules.investments.infrastructure.cipher import FernetCipher
 from app.modules.investments.infrastructure.persistence import SqlAlchemyInvestmentsUnitOfWork
 from app.shared.api.auth import CurrentUserId
 from app.shared.api.contracts import Converter, Preference
@@ -324,3 +331,70 @@ async def create_event(
         nominal=body.nominal,
     )
     return EventResponse.model_validate(event)
+
+
+class SaveCredentialsRequest(BaseModel):
+    username: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    # SecretStr: la contraseña no aparece en logs, reprs ni errores de validación.
+    password: SecretStr
+
+
+class CredentialsStatusResponse(BaseModel):
+    configured: bool
+    # Solo las dos primeras letras del usuario; la contraseña nunca se devuelve.
+    username_hint: str | None
+    updated_at: datetime | None
+
+
+def get_cipher(request: Request) -> FernetCipher:
+    return FernetCipher(request.app.state.settings.credentials_key.get_secret_value())
+
+
+Cipher = Annotated[FernetCipher, Depends(get_cipher)]
+
+brokers_router = APIRouter(
+    prefix="/brokers",
+    tags=["inversiones"],
+    responses={status.HTTP_401_UNAUTHORIZED: {"description": "Token inválido o vencido"}},
+)
+
+
+@brokers_router.put(
+    "/{broker}/credentials",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Guardar mis credenciales del broker",
+    description="Se guardan cifradas y reemplazan a las anteriores. No se verifican contra IOL.",
+)
+async def save_credentials(
+    broker: Broker,
+    body: SaveCredentialsRequest,
+    user_id: CurrentUserId,
+    uow: InvestmentsUow,
+    cipher: Cipher,
+) -> None:
+    password = body.password.get_secret_value()
+    await SaveCredentials(uow, cipher)(user_id, broker, body.username, password)
+
+
+@brokers_router.get(
+    "/{broker}/credentials",
+    summary="Ver si tengo credenciales del broker",
+    description="Solo el estado: nunca devuelve el usuario completo ni la contraseña.",
+)
+async def credentials_status(broker: Broker, uow: InvestmentsUow) -> CredentialsStatusResponse:
+    stored = await CredentialsStatus(uow)(broker)
+    if stored is None:
+        return CredentialsStatusResponse(configured=False, username_hint=None, updated_at=None)
+    return CredentialsStatusResponse(
+        configured=True, username_hint=stored.username_hint, updated_at=stored.updated_at
+    )
+
+
+@brokers_router.delete(
+    "/{broker}/credentials",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Borrar mis credenciales del broker",
+    description="Borrar dos veces no es error.",
+)
+async def delete_credentials(broker: Broker, uow: InvestmentsUow) -> None:
+    await DeleteCredentials(uow)(broker)
