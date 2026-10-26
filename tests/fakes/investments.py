@@ -6,7 +6,7 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID
 
-from app.modules.investments.domain.instrument import Instrument, Market
+from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
 from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import Trade, TradeSide
 from app.shared.domain.cash import CashAccount
@@ -68,6 +68,18 @@ class InMemoryPrices:
         return latest
 
 
+class InMemoryCryptoStore:
+    def __init__(self) -> None:
+        self.instruments: list[Instrument] = []
+        self.prices: list[InstrumentPrice] = []
+
+    async def list_crypto(self) -> list[Instrument]:
+        return [i for i in self.instruments if i.type is InstrumentType.CRYPTO]
+
+    async def add(self, price: InstrumentPrice) -> None:
+        self.prices.append(price)
+
+
 class FakeCash:
     """Las cuentas de ledger que ve investments y los movimientos que pidió."""
 
@@ -91,6 +103,29 @@ class FakeCash:
         description: str,
     ) -> None:
         self.recorded.append((account_id, amount, incoming))
+
+
+class FakePriceSyncUnitOfWork:
+    def __init__(self) -> None:
+        self.store = InMemoryCryptoStore()
+        self.commits = 0
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        pass
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    async def rollback(self) -> None:
+        pass
 
 
 class FakeInvestmentsUnitOfWork:

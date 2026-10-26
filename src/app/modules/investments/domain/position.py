@@ -19,7 +19,7 @@ class Position:
     cost: Decimal
     realized_pnl: Decimal
     current_price: Decimal
-    # MANUAL o LAST_TRADE: el de fecha más reciente (decisión del PO).
+    # MANUAL, API o LAST_TRADE: el de fecha más reciente (decisión del PO).
     price_source: str
     price_date: date
 
@@ -73,10 +73,10 @@ def build_positions(
         state[key] = (quantity, cost, realized, trade)
     positions = []
     for (account_id, instrument_id), (quantity, cost, realized, last) in state.items():
-        manual = prices.get(instrument_id)
-        # A igual fecha gana el precio cargado a mano.
-        if manual is not None and manual.date >= last.date:
-            price, source, on = manual.price, "MANUAL", manual.date
+        stored = prices.get(instrument_id)
+        # A igual fecha gana el precio guardado (manual o de la API) sobre la operación.
+        if stored is not None and stored.date >= last.date:
+            price, source, on = stored.price, stored.source.value, stored.date
         else:
             price, source, on = last.price, "LAST_TRADE", last.date
         instrument = instruments[instrument_id]
