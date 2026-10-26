@@ -37,20 +37,24 @@ jobs:
             exit 1
           fi
 
+      # PRs apilados: al mergear (squash) el anterior, el siguiente sigue trayendo el commit viejo
+      # de ese PR. git cherry lo marca como ya aplicado (mismo contenido), así que solo cuentan y
+      # se miden los commits cuyo contenido todavía no está en develop.
       - name: single-commit
         if: github.base_ref == 'develop'
-        env:
-          COMMITS: ${{ github.event.pull_request.commits }}
         run: |
-          if (( COMMITS != 1 )); then
-            echo "::error::El PR tiene $COMMITS commits y debe tener 1. Corregí con: git commit --amend y git push --force-with-lease."
+          new=$(git cherry "$BASE_SHA" "$HEAD_SHA" | awk '/^\+/ { print $2 }')
+          count=$(grep -c . <<<"$new" || true)
+          if (( count != 1 )); then
+            echo "::error::El PR tiene $count commits nuevos y debe tener 1. Corregí con: git commit --amend y git push --force-with-lease."
             exit 1
           fi
+          echo "NEW_COMMIT=$new" >> "$GITHUB_ENV"
 
       - name: size (additions + deletions <= 400)
         if: github.base_ref == 'develop'
         run: |
-          lines=$(git diff --numstat "$BASE_SHA...$HEAD_SHA" -- . \
+          lines=$(git diff --numstat "$NEW_COMMIT^" "$NEW_COMMIT" -- . \
             ':!migrations/versions' ':!docs' ':!requirements*.txt' ':!frontend/package-lock.json' ':!frontend/src/components/ui' \
             | awk '{ total += $1 + $2 } END { print total + 0 }')
           echo "additions + deletions: $lines (máximo 400)"
