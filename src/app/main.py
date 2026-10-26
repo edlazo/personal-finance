@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import Settings, get_settings
+from app.modules.cards.api.routes import router as cards_router
 from app.modules.fx.api.routes import router as fx_router
 from app.modules.fx.application.currency_converter import CurrencyConverter
 from app.modules.fx.infrastructure.persistence import SqlAlchemyFxUnitOfWork
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(prices_router)
     app.include_router(events_router)
     app.include_router(brokers_router)
+    app.include_router(cards_router)
     return app
 
 
