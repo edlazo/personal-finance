@@ -47,3 +47,22 @@ class CredentialsRepository(Protocol):
     async def get_credentials(self, broker: Broker) -> BrokerCredentials | None: ...
 
     async def delete(self, broker: Broker) -> None: ...
+
+
+@dataclass(frozen=True)
+class BrokerLink:
+    """Decisión del PO: en la comitente vinculada, las tenencias vienen del broker."""
+
+    user_id: UUID
+    broker: Broker
+    account_id: UUID
+
+
+class BrokerLinkRepository(Protocol):
+    async def link(self, link: BrokerLink) -> None:
+        """Una cuenta por usuario y broker: vincular otra reemplaza la anterior."""
+        ...
+
+    async def linked_account(self, broker: Broker) -> UUID | None: ...
+
+    async def broker_of(self, account_id: UUID) -> Broker | None: ...

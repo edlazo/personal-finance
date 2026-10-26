@@ -5,7 +5,11 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
-from app.modules.investments.application.register_trade import TradesUnitOfWork, holding_of
+from app.modules.investments.application.register_trade import (
+    TradesUnitOfWork,
+    ensure_not_linked,
+    holding_of,
+)
 from app.modules.investments.domain.event import EventKind, InstrumentEvent, check_event
 
 LABELS = {
@@ -34,6 +38,7 @@ class RegisterEvent:
         async with self.uow:
             account = await self.uow.cash.account(account_id)
             instrument = await self.uow.instruments.get_instrument(instrument_id)
+            await ensure_not_linked(self.uow, account_id)
             holding = await holding_of(self.uow, account_id, instrument_id)
             check_event(event, account, instrument, holding)
             await self.uow.events.add(event)

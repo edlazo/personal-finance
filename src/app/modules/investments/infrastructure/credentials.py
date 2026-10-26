@@ -1,13 +1,13 @@
 """Tabla y repositorio de las credenciales cifradas de brokers."""
 
 from datetime import datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum, LargeBinary, String, UniqueConstraint, delete
+from sqlalchemy import DateTime, Enum, ForeignKey, LargeBinary, String, UniqueConstraint, delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.modules.investments.domain.credentials import Broker, BrokerCredentials
+from app.modules.investments.domain.credentials import Broker, BrokerCredentials, BrokerLink
 from app.shared.infrastructure.database import Base
 from app.shared.infrastructure.user_scoped import UserOwnedMixin, UserScopedRepository
 
@@ -55,3 +55,37 @@ class SqlAlchemyCredentialsRepository(UserScopedRepository[BrokerCredentialsMode
     async def delete(self, broker: Broker) -> None:
         m = BrokerCredentialsModel
         await self.session.execute(delete(m).where(m.user_id == self.user_id, m.broker == broker))
+
+
+class BrokerLinkModel(UserOwnedMixin, Base):
+    __tablename__ = "broker_links"
+    __table_args__ = (UniqueConstraint("user_id", "broker"),)
+
+    broker: Mapped[Broker] = mapped_column(
+        Enum(Broker, name="broker", native_enum=False, length=10)
+    )
+    account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.id"), index=True)
+
+
+class SqlAlchemyBrokerLinkRepository(UserScopedRepository[BrokerLinkModel]):
+    model = BrokerLinkModel
+
+    async def link(self, link: BrokerLink) -> None:
+        upsert = insert(BrokerLinkModel).values(
+            id=uuid4(), user_id=self.user_id, broker=link.broker, account_id=link.account_id
+        )
+        await self.session.execute(
+            upsert.on_conflict_do_update(
+                index_elements=["user_id", "broker"], set_={"account_id": link.account_id}
+            )
+        )
+
+    async def linked_account(self, broker: Broker) -> UUID | None:
+        query = self.scoped().where(BrokerLinkModel.broker == broker)
+        found = await self.session.scalar(query)
+        return None if found is None else found.account_id
+
+    async def broker_of(self, account_id: UUID) -> Broker | None:
+        query = self.scoped().where(BrokerLinkModel.account_id == account_id)
+        found = await self.session.scalar(query)
+        return None if found is None else found.broker
