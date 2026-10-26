@@ -1,15 +1,18 @@
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
+import httpx2
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from structlog.testing import capture_logs
 
 from app.config import Settings
+from app.modules.investments.infrastructure.iol import IolClient
 from app.modules.investments.infrastructure.jobs import (
     schedule_investment_jobs,
     sync_crypto_prices,
 )
+from app.modules.ledger.infrastructure.cash_movements import LedgerCashMovements
 from app.shared.domain.money import Currency
 
 
@@ -29,8 +32,14 @@ def test_crypto_prices_run_every_hour() -> None:
     scheduler = AsyncIOScheduler()
 
     schedule_investment_jobs(
-        scheduler, Settings(_env_file=None), async_sessionmaker(), BrokenProvider()
+        scheduler,
+        Settings(_env_file=None),
+        async_sessionmaker(),
+        BrokenProvider(),
+        IolClient(httpx2.AsyncClient(), "https://iol.test"),
+        LedgerCashMovements,
     )
 
-    [job] = scheduler.get_jobs()
-    assert (job.id, "minute='0'" in str(job.trigger)) == ("crypto_prices", True)
+    crypto, iol = scheduler.get_jobs()
+    assert (crypto.id, "minute='0'" in str(crypto.trigger)) == ("crypto_prices", True)
+    assert (iol.id, "day_of_week='mon-fri'" in str(iol.trigger)) == ("iol_portfolios", True)

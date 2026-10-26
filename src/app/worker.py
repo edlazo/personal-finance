@@ -17,7 +17,9 @@ from app.config import get_settings
 from app.modules.fx.infrastructure.dolarapi import DolarApiProvider
 from app.modules.fx.infrastructure.jobs import schedule_fx_jobs
 from app.modules.investments.infrastructure.coingecko import CoinGeckoProvider
+from app.modules.investments.infrastructure.iol import IolClient
 from app.modules.investments.infrastructure.jobs import schedule_investment_jobs
+from app.modules.ledger.infrastructure.cash_movements import LedgerCashMovements
 from app.shared.infrastructure.database import create_engine, create_session_factory
 from app.shared.infrastructure.logging import configure_logging
 
@@ -41,7 +43,10 @@ async def run(stop: asyncio.Event) -> None:
         coingecko = CoinGeckoProvider(
             client, settings.coingecko_url, api_key=key.get_secret_value() if key else None
         )
-        schedule_investment_jobs(scheduler, settings, session_factory, coingecko)
+        iol = IolClient(client, settings.iol_url)
+        schedule_investment_jobs(
+            scheduler, settings, session_factory, coingecko, iol, LedgerCashMovements
+        )
         scheduler.start()
         logger.info("worker_started")
         try:

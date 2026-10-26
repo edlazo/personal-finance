@@ -15,8 +15,10 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     delete,
+    select,
 )
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.modules.investments.domain.credentials import Broker, BrokerCredentials, BrokerLink
@@ -183,3 +185,14 @@ class SqlAlchemyCallBudgetRepository(UserScopedRepository[BrokerCallsModel]):
             where=m.calls + calls <= limit,
         )
         return await self.session.scalar(upsert.returning(m.calls)) is not None
+
+
+async def users_to_sync(session: AsyncSession, broker: Broker) -> list[UUID]:
+    """Usuarios con credenciales y una cuenta vinculada a ese broker."""
+    link, creds = BrokerLinkModel, BrokerCredentialsModel
+    query = (
+        select(link.user_id)
+        .join(creds, (creds.user_id == link.user_id) & (creds.broker == link.broker))
+        .where(link.broker == broker)
+    )
+    return list(await session.scalars(query))

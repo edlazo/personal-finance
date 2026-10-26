@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # pública, que tiene límites más bajos.
     coingecko_url: str = "https://api.coingecko.com/api/v3"
     coingecko_api_key: SecretStr | None = None
+    # Portafolio de IOL (PF-51). IOL cobra desde 25.000 llamadas por mes: se corta al 80 %.
+    iol_url: str = "https://api.invertironline.com"
+    iol_monthly_calls: int = 20_000
 
     @model_validator(mode="after")
     def _require_real_secret_in_production(self) -> Self:
