@@ -32,6 +32,7 @@ from app.modules.investments.domain.instrument import (
 )
 from app.modules.investments.domain.price import InstrumentPrice, PriceSource
 from app.modules.investments.domain.trade import Trade, TradeSide
+from app.modules.investments.infrastructure.credentials import SqlAlchemyCredentialsRepository
 from app.shared.domain.cash import CashMovements
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import Base
@@ -287,6 +288,7 @@ class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
     trades: SqlAlchemyTradeRepository
     prices: SqlAlchemyPriceRepository
     events: SqlAlchemyEventRepository
+    credentials: SqlAlchemyCredentialsRepository
     cash: CashMovements
 
     def __init__(
@@ -305,6 +307,7 @@ class SqlAlchemyInvestmentsUnitOfWork(SqlAlchemyUnitOfWork):
         self.trades = SqlAlchemyTradeRepository(self.session, self._user_id)
         self.prices = SqlAlchemyPriceRepository(self.session, self._user_id)
         self.events = SqlAlchemyEventRepository(self.session, self._user_id)
+        self.credentials = SqlAlchemyCredentialsRepository(self.session, self._user_id)
         # Misma sesión: la operación y el movimiento de ledger se confirman juntos.
         self.cash = self._cash(self.session, self._user_id)
         return self
