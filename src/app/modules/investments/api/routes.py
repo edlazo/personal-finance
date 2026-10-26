@@ -13,6 +13,7 @@ from app.modules.investments.application.list_positions import ListPositions
 from app.modules.investments.application.manage_credentials import (
     CredentialsStatus,
     DeleteCredentials,
+    LinkAccount,
     SaveCredentials,
 )
 from app.modules.investments.application.manage_instruments import (
@@ -344,6 +345,12 @@ class CredentialsStatusResponse(BaseModel):
     # Solo las dos primeras letras del usuario; la contraseña nunca se devuelve.
     username_hint: str | None
     updated_at: datetime | None
+    # La comitente cuyas tenencias vienen del broker (PUT /brokers/{broker}/account).
+    linked_account_id: UUID | None
+
+
+class LinkAccountRequest(BaseModel):
+    account_id: UUID
 
 
 def get_cipher(request: Request) -> FernetCipher:
@@ -383,11 +390,29 @@ async def save_credentials(
 )
 async def credentials_status(broker: Broker, uow: InvestmentsUow) -> CredentialsStatusResponse:
     stored = await CredentialsStatus(uow)(broker)
-    if stored is None:
-        return CredentialsStatusResponse(configured=False, username_hint=None, updated_at=None)
+    async with uow:
+        linked = await uow.links.linked_account(broker)
     return CredentialsStatusResponse(
-        configured=True, username_hint=stored.username_hint, updated_at=stored.updated_at
+        configured=stored is not None,
+        username_hint=None if stored is None else stored.username_hint,
+        updated_at=None if stored is None else stored.updated_at,
+        linked_account_id=linked,
     )
+
+
+@brokers_router.put(
+    "/{broker}/account",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Vincular una comitente con el broker",
+    description=(
+        "Sus tenencias y precios vienen del portafolio del broker: en esa cuenta no se cargan "
+        "operaciones ni eventos a mano. Vincular otra cuenta reemplaza la anterior."
+    ),
+)
+async def link_account(
+    broker: Broker, body: LinkAccountRequest, user_id: CurrentUserId, uow: InvestmentsUow
+) -> None:
+    await LinkAccount(uow)(user_id, broker, body.account_id)
 
 
 @brokers_router.delete(

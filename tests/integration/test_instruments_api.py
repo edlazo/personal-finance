@@ -265,7 +265,8 @@ async def test_broker_credentials_are_stored_encrypted_and_never_returned(
     assert (saved.status_code, saved.content) == (204, b"")
     assert (status.json()["configured"], status.json()["username_hint"]) == (True, "el***")
     assert secret_password not in status.text
-    assert others == {"configured": False, "username_hint": None, "updated_at": None}
+    assert others["configured"] is False
+    assert (others["username_hint"], others["updated_at"]) == (None, None)
     assert all(secret_password.encode() not in row for row in rows)
     assert (
         client.delete(url, headers=ana).status_code
@@ -275,3 +276,29 @@ async def test_broker_credentials_are_stored_encrypted_and_never_returned(
     assert client.get(url, headers=ana).json()["configured"] is False
     assert client.put(url, json={"username": "x", "password": "y"}).status_code == 401
     assert client.get("/brokers/BALANZ/credentials", headers=ana).status_code == 422
+
+
+def test_linking_a_broker_account_blocks_manual_trades(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    auth = sign_up()
+
+    def new_account(name: str, kind: str) -> str:
+        body = {"name": name, "type": kind, "currency": "ARS", "initial_balance": "1000"}
+        account_id: str = client.post("/accounts", headers=auth, json=body).json()["id"]
+        return account_id
+
+    iol, caja = new_account("IOL", "BROKER"), new_account("Caja", "CASH")
+    ggal = create(client, auth, ticker="GGAL", name="Galicia", type="STOCK").json()["id"]
+    url = "/brokers/IOL/account"
+
+    wrong = client.put(url, headers=auth, json={"account_id": caja})
+    linked = client.put(url, headers=auth, json={"account_id": iol})
+    status = client.get("/brokers/IOL/credentials", headers=auth).json()
+    body = {"account_id": iol, "instrument_id": ggal, "side": "BUY", "quantity": "1"}
+    trade = client.post("/trades", headers=auth, json=body | {"price": "1", "date": "2026-10-26"})
+
+    assert (wrong.status_code, linked.status_code) == (422, 204)
+    assert (status["linked_account_id"], status["configured"]) == (iol, False)
+    assert trade.status_code == 422
+    assert "vinculada a IOL" in trade.json()["detail"]

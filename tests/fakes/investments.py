@@ -6,7 +6,7 @@ from types import TracebackType
 from typing import Self
 from uuid import UUID
 
-from app.modules.investments.domain.credentials import Broker, BrokerCredentials
+from app.modules.investments.domain.credentials import Broker, BrokerCredentials, BrokerLink
 from app.modules.investments.domain.event import InstrumentEvent
 from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
 from app.modules.investments.domain.price import InstrumentPrice
@@ -99,6 +99,21 @@ class InMemoryCryptoStore:
         self.prices.append(price)
 
 
+class InMemoryLinks:
+    def __init__(self) -> None:
+        self.items: dict[Broker, BrokerLink] = {}
+
+    async def link(self, link: BrokerLink) -> None:
+        self.items[link.broker] = link
+
+    async def linked_account(self, broker: Broker) -> UUID | None:
+        link = self.items.get(broker)
+        return None if link is None else link.account_id
+
+    async def broker_of(self, account_id: UUID) -> Broker | None:
+        return next((b for b, link in self.items.items() if link.account_id == account_id), None)
+
+
 class FakeCash:
     """Las cuentas de ledger que ve investments y los movimientos que pidió."""
 
@@ -159,6 +174,7 @@ class FakeInvestmentsUnitOfWork:
         self.trades = InMemoryTrades()
         self.prices = InMemoryPrices()
         self.events = InMemoryEvents()
+        self.links = InMemoryLinks()
         self.cash = FakeCash()
         self.commits = 0
 
