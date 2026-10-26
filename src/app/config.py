@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     fx_timezone: str = "America/Argentina/Buenos_Aires"
     fx_business_hours: str = "10-17"
     fx_daily_hour: int = 12
+    # Precios de cripto (PF-50), cada hora. La key "demo" es opcional: sin ella se usa la API
+    # pública, que tiene límites más bajos.
+    coingecko_url: str = "https://api.coingecko.com/api/v3"
+    coingecko_api_key: SecretStr | None = None
 
     @model_validator(mode="after")
     def _require_real_secret_in_production(self) -> Self:
