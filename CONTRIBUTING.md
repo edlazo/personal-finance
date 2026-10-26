@@ -79,6 +79,18 @@ git add -A ; git commit --amend --no-edit
 ```
 Instalación de los hooks (una sola vez): `pre-commit install` (instala los tres tipos). Los hooks usan las herramientas del venv, así que hay que commitear y pushear con el venv activado.
 
+### Tests de integración sin Docker
+Los tests de integración levantan Postgres con testcontainers. Si Docker no anda, sirve cualquier Postgres 16 o 17 apuntado con `TEST_DATABASE_URL`, por ejemplo los binarios que trae el wheel `pgserver` (se descarga con `pip download pgserver --no-deps --only-binary :all: --python-version 3.12 --platform win_amd64` y se descomprime):
+
+```bash
+pg/pgserver/pginstall/bin/initdb -D pgdata -U postgres -A trust
+pg/pgserver/pginstall/bin/pg_ctl -D pgdata -o "-p 54329" -l pg.log start
+pg/pgserver/pginstall/bin/createdb -h 127.0.0.1 -p 54329 -U postgres personal_finance_test
+TEST_DATABASE_URL=postgresql+asyncpg://postgres@127.0.0.1:54329/personal_finance_test pytest --cov
+```
+
+En Windows, `postgres` no arranca con un usuario administrador: hay que usar `pg_ctl`.
+
 ## Versionado
 SemVer con tags `vMAJOR.MINOR.PATCH` sobre `main`, al cierre de los sprints que generan release (ver [roadmap](docs/scrum/roadmap.md)).
 

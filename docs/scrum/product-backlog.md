@@ -278,7 +278,7 @@ _Categorías, ingresos, gastos y transferencias (incluye compra/venta de USD)._
 - [ ] Comisión opcional registrada como gasto en categoría 'Comisiones'
 
 ### US-062 - Gastos y transferencias sin saldo negativo
-`Story` | **3 SP** | Prioridad **Medium** | Sin sprint | label `ledger` | agregada en la Review del Sprint 5
+`Story` | **3 SP** | Prioridad **Medium** | Sprint 8 | label `ledger` | agregada en la Review del Sprint 5
 
 **Como** usuario, **quiero** que un gasto o una transferencia no deje en negativo una cuenta que no lo admite, **para** que mis saldos sean reales.
 
