@@ -22,7 +22,7 @@ from app.modules.investments.infrastructure.credentials import (
     BrokerCredentialsModel,
     HoldingSnapshotModel,
 )
-from app.modules.investments.infrastructure.jobs import sync_crypto_prices
+from app.modules.investments.infrastructure.jobs import sync_crypto_prices, sync_iol_portfolios
 from app.modules.investments.infrastructure.persistence import (
     InstrumentModel,
     SqlAlchemyInvestmentsUnitOfWork,
@@ -384,3 +384,38 @@ class FixedIol:
         amounts = (Decimal("10"), Decimal("6000"), Decimal("6500"))
         stock, ars = InstrumentType.STOCK, Currency.ARS
         return [BrokerHolding("GGAL", "Galicia", stock, Market.BYMA, ars, *amounts)]
+
+
+async def test_the_iol_job_syncs_each_linked_user_even_if_another_fails(
+    client: TestClient, sign_up: Callable[[], dict[str, str]], engine: AsyncEngine
+) -> None:
+    def linked_user(username: str) -> dict[str, str]:
+        auth = sign_up()
+        body = {"name": "IOL", "type": "BROKER", "currency": "ARS", "initial_balance": "0"}
+        iol = client.post("/accounts", headers=auth, json=body).json()["id"]
+        client.put("/brokers/IOL/account", headers=auth, json={"account_id": iol})
+        login = {"username": username, "password": "clave"}
+        client.put("/brokers/IOL/credentials", headers=auth, json=login)
+        rate = {"type": "MEP", "buy": "1000", "sell": "1000", "quoted_at": "2026-01-02T12:00:00Z"}
+        client.post("/fx/rates", headers=auth, json=rate)
+        return auth
+
+    broken, ok = linked_user("otro"), linked_user("elias")
+    state = client.app.state  # type: ignore[attr-defined]
+    cipher = FernetCipher(state.settings.credentials_key.get_secret_value())
+    factory = create_session_factory(engine)
+
+    await sync_iol_portfolios(
+        factory, OnlyElias(), cipher, state.cash_movements, 100, ZoneInfo("UTC")
+    )
+
+    assert client.get("/positions", headers=broken).json()["positions"] == []
+    [position] = client.get("/positions", headers=ok).json()["positions"]
+    assert position["price_source"] == "IOL"
+
+
+class OnlyElias(FixedIol):
+    async def portfolio(self, username: str, password: str) -> list[BrokerHolding]:
+        if username != "elias":
+            raise RuntimeError("IOL rechazó las credenciales")
+        return await super().portfolio(username, password)
