@@ -1,7 +1,8 @@
 """Tarjetas de crédito."""
 
+from calendar import monthrange
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Protocol
@@ -23,6 +24,16 @@ class CardNetwork(StrEnum):
 
 class InvalidCardError(DomainError):
     pass
+
+
+def _day(year: int, month: int, day: int) -> date:
+    """Ese día del mes o, si el mes es más corto, su último día (decisión del PO)."""
+    return date(year, month, min(day, monthrange(year, month)[1]))
+
+
+def _shift(year: int, month: int, months: int) -> tuple[int, int]:
+    year, index = divmod(year * 12 + month - 1 + months, 12)
+    return year, index + 1
 
 
 @dataclass
@@ -53,6 +64,20 @@ class CreditCard:
     @property
     def currencies(self) -> list[Currency]:
         return [Currency.ARS, Currency.USD] if self.dual_currency else [Currency.ARS]
+
+    def statement(self, purchase_date: date, months_later: int = 0) -> tuple[date, date]:
+        """Cierre y vencimiento del resumen que incluye esa fecha, o del de N meses después.
+        Una compra del mismo día del cierre entra en ese resumen."""
+        year, month = purchase_date.year, purchase_date.month
+        if purchase_date > _day(year, month, self.closing_day):
+            months_later += 1
+        year, month = _shift(year, month, months_later)
+        closing = _day(year, month, self.closing_day)
+        # Un vencimiento anterior al cierre en el mes cae en el mes siguiente.
+        due_year, due_month = (
+            (year, month) if self.due_day > self.closing_day else _shift(year, month, 1)
+        )
+        return closing, _day(due_year, due_month, self.due_day)
 
 
 class CreditCardRepository(Protocol):
