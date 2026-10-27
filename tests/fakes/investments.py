@@ -1,5 +1,6 @@
 """Dobles en memoria para los casos de uso de inversiones."""
 
+import copy
 from datetime import date
 from decimal import Decimal
 from types import TracebackType
@@ -211,8 +212,15 @@ class FakeInvestmentsUnitOfWork:
         self.budget = InMemoryBudget()
         self.cash = FakeCash()
         self.commits = 0
+        self._saved: dict[str, dict[str, object]] = {}
 
     async def __aenter__(self) -> Self:
+        # Una copia del estado de cada repositorio (commits es un int: no tiene).
+        self._saved = {
+            name: {attr: copy.copy(value) for attr, value in vars(repo).items()}
+            for name, repo in vars(self).items()
+            if not name.startswith("_") and hasattr(repo, "__dict__")
+        }
         return self
 
     async def __aexit__(
@@ -221,7 +229,10 @@ class FakeInvestmentsUnitOfWork:
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
-        pass
+        # Como la base: si algo falla, los repositorios vuelven a como estaban al entrar.
+        if exc is not None:
+            for name, state in self._saved.items():
+                vars(getattr(self, name)).update(state)
 
     async def commit(self) -> None:
         self.commits += 1
