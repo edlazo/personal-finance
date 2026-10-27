@@ -48,15 +48,16 @@ Se ejecutan en este orden. Si una falla, las siguientes no corren.
 
 | # | Check | Regla | Aplica a |
 |---|---|---|---|
-| 1 | `pr-rules / single-commit` | El PR tiene **exactamente 1 commit**. Para corregir, se hace `git commit --amend` y luego `git push --force-with-lease`. | PRs a `develop` |
+| 1 | `pr-rules / single-commit` | El PR tiene **exactamente 1 commit nuevo** (no cuentan los commits de un PR apilado anterior que ya entró a `develop`; el tamaño también se mide solo sobre el commit nuevo). Para corregir, se hace `git commit --amend` y luego `git push --force-with-lease`. | PRs a `develop` |
 | 2 | `pr-rules / size` | **additions + deletions ≤ 400**. No cuentan `migrations/versions/**`, `docs/**`, `requirements*.txt`, `frontend/package-lock.json` ni `frontend/src/components/ui/**` (componentes generados por shadcn). | PRs a `develop` |
 | 3 | `pr-rules / branch-name` | La rama respeta `feature|fix|hotfix|chore/PF-<n>-<slug>`. Dependabot está exento. | PRs a `develop` |
 | — | `pr-rules / origin` | A `main` solo llegan PRs desde `develop` o `hotfix/*`. | PRs a `main` |
 | 4 | `prefix` | El prefijo del **título del PR y de cada commit** está en la lista permitida (ver abajo), el título incluye `[PF-<n>]` y ninguno pasa de 72 caracteres. Dependabot está exento de la key y del largo; en los PRs a `main` el largo de los commits no se valida, porque GitHub les suma ` (#n)` al hacer squash. | Todos |
 | 5 | `lint` | `ruff check` + `ruff format --check` sin cambios: el código subido tiene que ser idéntico a lo que produciría el linter (misma versión de ruff fijada en `requirements-dev.txt`). | Todos |
 | 6 | `typecheck`, `test`, `migrations` | mypy, import-linter, pytest con cobertura ≥ 85 % (Postgres como service), `alembic upgrade head` + `alembic check`. | Todos |
+| 7 | `image` | Construye la imagen Docker sin publicarla y verifica que la API y el worker importan adentro. La publicación es solo desde `main` (`docker.yml`). | Todos |
 
-Los checks 5 y 6 viven en el workflow reutilizable `quality.yml`, que también corre en cada push a `develop` y `main` (`ci.yml`). El prefijo se valida con [`scripts/check_commit_msg.py`](scripts/check_commit_msg.py), el mismo script del hook `commit-msg`.
+Los checks 5 a 7 viven en el workflow reutilizable `quality.yml`, que también corre en cada push a `develop` y `main` (`ci.yml`). El prefijo se valida con [`scripts/check_commit_msg.py`](scripts/check_commit_msg.py), el mismo script del hook `commit-msg`.
 
 **Prefijos permitidos:** `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `style`, `build`, `ci`, `chore`, `revert`.
 
@@ -77,6 +78,18 @@ ruff check --fix . ; ruff format .
 git add -A ; git commit --amend --no-edit
 ```
 Instalación de los hooks (una sola vez): `pre-commit install` (instala los tres tipos). Los hooks usan las herramientas del venv, así que hay que commitear y pushear con el venv activado.
+
+### Tests de integración sin Docker
+Los tests de integración levantan Postgres con testcontainers. Si Docker no anda, sirve cualquier Postgres 16 o 17 apuntado con `TEST_DATABASE_URL`, por ejemplo los binarios que trae el wheel `pgserver` (se descarga con `pip download pgserver --no-deps --only-binary :all: --python-version 3.12 --platform win_amd64` y se descomprime):
+
+```bash
+pg/pgserver/pginstall/bin/initdb -D pgdata -U postgres -A trust
+pg/pgserver/pginstall/bin/pg_ctl -D pgdata -o "-p 54329" -l pg.log start
+pg/pgserver/pginstall/bin/createdb -h 127.0.0.1 -p 54329 -U postgres personal_finance_test
+TEST_DATABASE_URL=postgresql+asyncpg://postgres@127.0.0.1:54329/personal_finance_test pytest --cov
+```
+
+En Windows, `postgres` no arranca con un usuario administrador: hay que usar `pg_ctl`.
 
 ## Versionado
 SemVer con tags `vMAJOR.MINOR.PATCH` sobre `main`, al cierre de los sprints que generan release (ver [roadmap](docs/scrum/roadmap.md)).

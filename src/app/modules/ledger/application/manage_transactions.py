@@ -5,6 +5,7 @@ from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
+from app.modules.ledger.application.balance_guard import ensure_non_negative
 from app.modules.ledger.application.create_transaction import TransactionsUnitOfWork
 from app.modules.ledger.domain.account import AccountArchivedError
 from app.modules.ledger.domain.category import CategoryKind
@@ -18,6 +19,10 @@ from app.modules.ledger.domain.transaction import (
 async def _editable_legs(uow: TransactionsUnitOfWork, transaction_id: UUID) -> list[Transaction]:
     """El movimiento, o las dos patas si es una transferencia; nunca de una cuenta archivada."""
     transaction = await uow.transactions.get_transaction(transaction_id)
+    if transaction.trade_id is not None:
+        raise InvalidTransactionError(
+            "Los movimientos de una operación de inversión no se editan ni se borran"
+        )
     legs = [transaction]
     if transaction.transfer_group_id is not None:
         legs = await uow.transactions.transfer_legs(transaction.transfer_group_id)
@@ -50,6 +55,15 @@ class UpdateTransaction:
                 raise InvalidTransactionError(
                     "En una transferencia solo se editan el monto, la fecha y la descripción"
                 )
+            # Compra o venta de dólares: cada pata tiene su monto y solo cambia la editada.
+            accounts = [await self.uow.accounts.get_account(leg.account_id) for leg in legs]
+            own_amounts = len({account.currency for account in accounts}) > 1
+
+            def new_amount(leg: Transaction) -> Decimal:
+                if amount is None or (own_amounts and leg.id != transaction_id):
+                    return leg.amount
+                return amount
+
             # replace() vuelve a validar el monto y limpia la descripción.
             edited = [
                 replace(
@@ -57,7 +71,7 @@ class UpdateTransaction:
                     account_id=account_id or leg.account_id,
                     kind=kind or leg.kind,
                     category_id=category_id or leg.category_id,
-                    amount=leg.amount if amount is None else amount,
+                    amount=new_amount(leg),
                     date=on or leg.date,
                     description=leg.description if description is None else description,
                 )
@@ -71,6 +85,12 @@ class UpdateTransaction:
                 check_movement(movement.kind, account, category)
             for leg in edited:
                 await self.uow.transactions.save(leg)
+            touched: dict[UUID, date] = {}
+            for before, after in zip(legs, edited, strict=True):
+                for account_id in (before.account_id, after.account_id):
+                    since = min(before.date, after.date, touched.get(account_id, after.date))
+                    touched[account_id] = since
+            await ensure_non_negative(self.uow, touched)
             await self.uow.commit()
         return next(leg for leg in edited if leg.id == transaction_id)
 
@@ -81,6 +101,9 @@ class DeleteTransaction:
 
     async def __call__(self, transaction_id: UUID) -> None:
         async with self.uow:
-            for leg in await _editable_legs(self.uow, transaction_id):
+            legs = await _editable_legs(self.uow, transaction_id)
+            for leg in legs:
                 await self.uow.transactions.delete(leg.id)
+            # Borrar un ingreso (o la pata que entra de una transferencia) puede dejar negativo.
+            await ensure_non_negative(self.uow, {leg.account_id: leg.date for leg in legs})
             await self.uow.commit()

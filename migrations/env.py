@@ -7,8 +7,11 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
+import app.modules.cards.infrastructure.persistence
 import app.modules.fx.infrastructure.persistence
 import app.modules.identity.infrastructure.models
+import app.modules.investments.infrastructure.credentials
+import app.modules.investments.infrastructure.persistence
 
 # Los modelos ORM de cada módulo se importan acá para que autogenerate los detecte.
 import app.modules.ledger.infrastructure.accounts

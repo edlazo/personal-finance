@@ -8,9 +8,19 @@ import httpx2
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+# Los jobs guardan filas con claves foráneas a users y accounts: sin esas tablas en la metadata,
+# SQLAlchemy no puede resolverlas y el insert falla.
+import app.modules.identity.infrastructure.models
+import app.modules.ledger.infrastructure.accounts
+import app.modules.ledger.infrastructure.persistence  # noqa: F401
 from app.config import get_settings
 from app.modules.fx.infrastructure.dolarapi import DolarApiProvider
 from app.modules.fx.infrastructure.jobs import schedule_fx_jobs
+from app.modules.investments.infrastructure.coingecko import CoinGeckoProvider
+from app.modules.investments.infrastructure.data912 import Data912Provider
+from app.modules.investments.infrastructure.iol import IolClient
+from app.modules.investments.infrastructure.jobs import schedule_investment_jobs
+from app.modules.ledger.infrastructure.cash_movements import LedgerCashMovements
 from app.shared.infrastructure.database import create_engine, create_session_factory
 from app.shared.infrastructure.logging import configure_logging
 
@@ -28,7 +38,22 @@ async def run(stop: asyncio.Event) -> None:
     async with httpx2.AsyncClient() as client:
         scheduler = create_scheduler()
         provider = DolarApiProvider(client, settings.dolarapi_url)
-        schedule_fx_jobs(scheduler, settings, create_session_factory(engine), provider)
+        session_factory = create_session_factory(engine)
+        schedule_fx_jobs(scheduler, settings, session_factory, provider)
+        key = settings.coingecko_api_key
+        coingecko = CoinGeckoProvider(
+            client, settings.coingecko_url, api_key=key.get_secret_value() if key else None
+        )
+        iol = IolClient(client, settings.iol_url)
+        schedule_investment_jobs(
+            scheduler,
+            settings,
+            session_factory,
+            coingecko,
+            iol,
+            LedgerCashMovements,
+            Data912Provider(client, settings.data912_url),
+        )
         scheduler.start()
         logger.info("worker_started")
         try:

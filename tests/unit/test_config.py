@@ -20,7 +20,8 @@ def test_defaults_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reads_dotenv_file(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "ENVIRONMENT=production\nDEBUG=true\nJWT_SECRET=una-clave-de-produccion-de-32-caracteres\n",
+        "ENVIRONMENT=production\nDEBUG=true\nJWT_SECRET=una-clave-de-produccion-de-32-caracteres\n"
+        "CREDENTIALS_KEY=PEoYk1W6c1r0Xk5lTE7rVQzp3o3t5TQxZb0fJ0r9mUo=\n",
         encoding="utf-8",
     )
 
@@ -58,7 +59,11 @@ def test_production_requires_a_real_jwt_secret() -> None:
         Settings(_env_file=None, environment="production")
 
     real = SecretStr("una-clave-de-produccion-de-32-caracteres-o-mas")
-    assert Settings(_env_file=None, environment="production", jwt_secret=real).jwt_secret == real
+    key = SecretStr("PEoYk1W6c1r0Xk5lTE7rVQzp3o3t5TQxZb0fJ0r9mUo=")
+    settings = Settings(
+        _env_file=None, environment="production", jwt_secret=real, credentials_key=key
+    )
+    assert settings.jwt_secret == real
 
 
 def test_jwt_secret_needs_32_characters() -> None:

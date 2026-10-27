@@ -56,6 +56,8 @@ class TransactionResponse(BaseModel):
     description: str | None
     # Solo en las dos patas de una transferencia (POST /transfers).
     transfer_group_id: UUID | None
+    # Solo en el movimiento de una operación de inversión (POST /trades).
+    trade_id: UUID | None
 
 
 class TransactionQuery(BaseModel):

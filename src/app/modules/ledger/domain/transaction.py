@@ -2,13 +2,14 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Protocol
 from uuid import UUID, uuid4
 
 from app.modules.ledger.domain.account import CENTS, Account
 from app.modules.ledger.domain.category import Category, CategoryKind
 from app.shared.domain.errors import DomainError
+from app.shared.domain.money import Currency
 
 
 class InvalidTransactionError(DomainError):
@@ -19,7 +20,9 @@ class InvalidTransactionError(DomainError):
 class Transaction:
     """El monto siempre es positivo; `kind` define si suma (ingreso) o resta (gasto).
 
-    Una transferencia son dos movimientos sin categoría ligados por `transfer_group_id`.
+    Una transferencia son dos movimientos sin categoría ligados por `transfer_group_id`. Una
+    operación de inversión es uno sin categoría ligado por `trade_id`; un dividendo o cupón, un
+    ingreso en "Rentas" ligado también por `trade_id` (el id del evento).
     """
 
     user_id: UUID
@@ -30,6 +33,7 @@ class Transaction:
     category_id: UUID | None
     description: str | None = None
     transfer_group_id: UUID | None = None
+    trade_id: UUID | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -38,8 +42,12 @@ class Transaction:
             raise InvalidTransactionError("El monto tiene que ser mayor a cero")
         if self.amount != self.amount.quantize(CENTS):
             raise InvalidTransactionError("El monto admite hasta 2 decimales")
-        if (self.category_id is None) == (self.transfer_group_id is None):
-            raise InvalidTransactionError("Un movimiento lleva categoría o es una transferencia")
+        transfer = self.transfer_group_id is not None
+        other = self.category_id is not None or self.trade_id is not None
+        if transfer == other:
+            raise InvalidTransactionError(
+                "Un movimiento lleva categoría o es parte de una transferencia o de una operación"
+            )
         self.description = (self.description or "").strip() or None
 
 
@@ -67,11 +75,19 @@ class TransactionFilter:
     amount_max: Decimal | None = None
 
 
+# Tipo de cambio efectivo: pesos por dólar, con 4 decimales.
+RATE_PRECISION = Decimal("0.0001")
+
+
 @dataclass(frozen=True)
 class Transfer:
     group_id: UUID
     outgoing: Transaction
     incoming: Transaction
+    # Solo en la compra o venta de dólares (US-020); sale de los dos montos guardados.
+    exchange_rate: Decimal | None = None
+    # Comisión: gasto aparte en el origen, no es una pata de la transferencia.
+    fee: Transaction | None = None
 
 
 def transfer(
@@ -81,22 +97,42 @@ def transfer(
     amount: Decimal,
     on: date,
     description: str | None = None,
+    received: Decimal | None = None,
 ) -> Transfer:
-    """Gasto en el origen e ingreso en el destino; no cuentan en los reportes (US-019)."""
+    """Gasto en el origen e ingreso en el destino; no cuentan en los reportes (US-019).
+
+    Entre monedas distintas (compra o venta de dólares) cada pata lleva su monto: `amount`
+    sale del origen y `received` entra al destino.
+    """
     if source.id == target.id:
         raise InvalidTransactionError("El origen y el destino tienen que ser cuentas distintas")
-    if source.currency is not target.currency:
-        raise InvalidTransactionError("Las cuentas tienen que ser de la misma moneda")
     if source.archived_at is not None or target.archived_at is not None:
         raise InvalidTransactionError("No se pueden cargar movimientos en una cuenta archivada")
+    same_currency = source.currency is target.currency
+    if same_currency and received not in (None, amount):
+        raise InvalidTransactionError("En la misma moneda sale y entra el mismo monto")
+    if not same_currency and received is None:
+        raise InvalidTransactionError("Entre monedas distintas hace falta el monto que entra")
     group = uuid4()
 
-    def leg(account: Account, kind: CategoryKind) -> Transaction:
+    def leg(account: Account, kind: CategoryKind, value: Decimal) -> Transaction:
         return Transaction(
-            user_id, account.id, kind, amount, on, None, description, transfer_group_id=group
+            user_id, account.id, kind, value, on, None, description, transfer_group_id=group
         )
 
-    return Transfer(group, leg(source, CategoryKind.EXPENSE), leg(target, CategoryKind.INCOME))
+    incoming = received if received is not None else amount
+    rate = None
+    if not same_currency:
+        pesos, dollars = (
+            (amount, incoming) if source.currency is Currency.ARS else (incoming, amount)
+        )
+        rate = (pesos / dollars).quantize(RATE_PRECISION, ROUND_HALF_UP)
+    return Transfer(
+        group,
+        leg(source, CategoryKind.EXPENSE, amount),
+        leg(target, CategoryKind.INCOME, incoming),
+        rate,
+    )
 
 
 class TransactionRepository(Protocol):
@@ -115,3 +151,7 @@ class TransactionRepository(Protocol):
     async def save(self, transaction: Transaction) -> None: ...
 
     async def delete(self, transaction_id: UUID) -> None: ...
+
+    async def daily_totals(self, account_id: UUID) -> dict[date, Decimal]:
+        """Ingresos menos gastos de la cuenta, sumados por día."""
+        ...
