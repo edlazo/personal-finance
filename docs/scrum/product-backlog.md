@@ -506,7 +506,7 @@ _Tarjetas, ciclos de resumen, compras en cuotas y pagos._
 - [ ] `GET /credit-cards/{id}/installments` muestra cuotas pendientes
 
 ### US-039 - Resumen del período
-`Story` | **3 SP** | Prioridad **High** | Sprint 9 | label `credit-cards`
+`Story` | **3 SP** | Prioridad **High** | Sprint 10 | label `credit-cards`
 
 **Como** usuario, **quiero** ver el resumen de cada período, **para** saber cuánto debo pagar y cuando.
 
@@ -514,7 +514,7 @@ _Tarjetas, ciclos de resumen, compras en cuotas y pagos._
 - [ ] `GET /credit-cards/{id}/statements/{period}` con consumos, cuotas, total ARS y USD, cierre y vencimiento
 
 ### US-040 - Pago de resumen
-`Story` | **3 SP** | Prioridad **High** | Sprint 9 | label `credit-cards`
+`Story` | **3 SP** | Prioridad **High** | Sprint 10 | label `credit-cards`
 
 **Como** usuario, **quiero** registrar el pago total o parcial del resumen, **para** reflejar la deuda real de la tarjeta.
 
