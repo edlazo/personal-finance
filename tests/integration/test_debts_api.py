@@ -66,3 +66,38 @@ def test_debts_and_loans_with_their_schedule(
     assert [d["direction"] for d in client.get("/debts", headers=ana).json()] == ["OWED", "LENT"]
     assert client.get("/debts", headers=beto).json() == []
     assert client.get(f"/debts/{debt['id']}", headers=beto).status_code == 404
+
+
+def test_paying_a_debt_shows_the_pending_balance_and_the_next_installment(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    ana = sign_up()
+    pesos = {"name": "Galicia", "type": "SAVINGS", "currency": "ARS", "initial_balance": "2000"}
+    account = client.post("/accounts", headers=ana, json=pesos).json()["id"]
+    body = {
+        "counterparty": "Juan",
+        "currency": "ARS",
+        "principal": "3000",
+        "installments": 3,
+        "start_date": "2027-01-10",
+    }
+    url = f"/debts/{client.post('/debts', headers=ana, json=body).json()['id']}"
+    payment = {"account_id": account, "amount": "1500", "date": "2027-02-10"}
+
+    paid = client.post(f"{url}/payments", headers=ana, json=payment)
+    too_much = client.post(f"{url}/payments", headers=ana, json=payment | {"amount": "1600"})
+    other = client.post(f"{url}/payments", headers=sign_up(), json=payment)
+    # Quedan 500 en la cuenta, que no puede quedar en negativo.
+    broke = client.post(f"{url}/payments", headers=ana, json=payment | {"amount": "600"})
+    [debt] = client.get("/debts", headers=ana).json()
+
+    assert [r.status_code for r in (paid, too_much, other, broke)] == [201, 422, 404, 422]
+    assert "1500.00" in too_much.json()["detail"]
+    assert (debt["paid"], debt["pending"]) == ("1500.00", "1500.00")
+    assert (debt["next_installment"]["number"], debt["next_installment"]["due_date"]) == (
+        2,
+        "2027-03-10",
+    )
+    schedule = client.get(url, headers=ana).json()["schedule"]
+    assert [i["paid"] for i in schedule] == [True, False, False]
+    assert client.get(f"/accounts/{account}", headers=ana).json()["balance"] == "500.00"
