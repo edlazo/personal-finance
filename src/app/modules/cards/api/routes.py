@@ -15,6 +15,7 @@ from app.modules.cards.application.manage_cards import (
     GetStatement,
     ListCards,
     PendingInstallments,
+    RegisterPayment,
     RegisterPurchase,
 )
 from app.modules.cards.domain.card import CardNetwork, CreditCard
@@ -25,6 +26,8 @@ from app.shared.api.dependencies import get_session_factory
 from app.shared.domain.money import Currency
 
 Day = Annotated[int, Field(ge=1, le=31)]
+# El mes de cierre del resumen.
+Period = Annotated[str, Path(pattern=r"^\d{4}-(0[1-9]|1[0-2])$", examples=["2026-11"])]
 
 
 class CreateCardRequest(BaseModel):
@@ -84,6 +87,29 @@ class StatementResponse(BaseModel):
     items: list[InstallmentResponse]
     total_ars: Decimal
     total_usd: Decimal
+    paid_ars: Decimal
+    paid_usd: Decimal
+    # Lo que falta pagar: un pago parcial deja saldo.
+    pending_ars: Decimal
+    pending_usd: Decimal
+
+
+class RegisterPaymentRequest(BaseModel):
+    account_id: UUID
+    amount: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
+    currency: Currency = Currency.ARS
+    date: date
+
+
+class PaymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    account_id: UUID
+    closing_date: date
+    amount: Decimal
+    currency: Currency
+    date: date
 
 
 def get_cards_uow(
@@ -185,11 +211,10 @@ async def pending_installments(card_id: UUID, uow: CardsUow) -> list[Installment
 )
 async def get_statement(
     card_id: UUID,
-    period: Annotated[str, Path(pattern=r"^\d{4}-(0[1-9]|1[0-2])$", examples=["2026-11"])],
+    period: Period,
     uow: CardsUow,
 ) -> StatementResponse:
-    year, month = (int(part) for part in period.split("-"))
-    statement = await GetStatement(uow=uow)(card_id, year, month)
+    statement = await GetStatement(uow=uow)(card_id, *_year_month(period))
     return StatementResponse(
         period=period,
         closing_date=statement.closing_date,
@@ -197,4 +222,42 @@ async def get_statement(
         items=[InstallmentResponse.model_validate(i) for i in statement.items],
         total_ars=statement.total(Currency.ARS),
         total_usd=statement.total(Currency.USD),
+        paid_ars=statement.paid.get(Currency.ARS, Decimal("0.00")),
+        paid_usd=statement.paid.get(Currency.USD, Decimal("0.00")),
+        pending_ars=statement.pending(Currency.ARS),
+        pending_usd=statement.pending(Currency.USD),
     )
+
+
+def _year_month(period: str) -> tuple[int, int]:
+    year, month = period.split("-")
+    return int(year), int(month)
+
+
+@router.post(
+    "/{card_id}/statements/{period}/payments",
+    status_code=status.HTTP_201_CREATED,
+    summary="Pagar un resumen, total o parcial",
+    description=(
+        "Sale de una cuenta activa en la moneda que se paga, como un movimiento sin categoría "
+        "(no es un gasto). No puede superar lo que falta pagar del resumen en esa moneda."
+    ),
+    responses={status.HTTP_404_NOT_FOUND: {"description": "La tarjeta o la cuenta no existe"}},
+)
+async def register_payment(
+    card_id: UUID,
+    period: Period,
+    body: RegisterPaymentRequest,
+    user_id: CurrentUserId,
+    uow: CardsUow,
+) -> PaymentResponse:
+    payment = await RegisterPayment(uow=uow)(
+        user_id,
+        card_id,
+        *_year_month(period),
+        account_id=body.account_id,
+        amount=body.amount,
+        currency=body.currency,
+        on=body.date,
+    )
+    return PaymentResponse.model_validate(payment)

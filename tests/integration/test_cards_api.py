@@ -100,3 +100,30 @@ def test_the_statement_of_a_period(
     assert (february["total_ars"], february["total_usd"]) == ("1000.00", "0.00")
     assert client.get(f"{url}/statements/2027-13", headers=ana).status_code == 422
     assert client.get(f"{url}/statements/2027-02", headers=sign_up()).status_code == 404
+
+
+def test_paying_a_statement_in_parts(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    ana = sign_up()
+    pesos = {"name": "Galicia", "type": "SAVINGS", "currency": "ARS", "initial_balance": "800"}
+    account = client.post("/accounts", headers=ana, json=pesos).json()["id"]
+    body = {"name": "Visa", "network": "VISA", "closing_day": 25, "due_day": 5}
+    url = f"/credit-cards/{client.post('/credit-cards', headers=ana, json=body).json()['id']}"
+    tv = {"description": "Tele", "amount": "1000", "installments": 2, "date": "2027-01-15"}
+    client.post(f"{url}/purchases", headers=ana, json=tv)
+    payment = {"account_id": account, "amount": "300", "date": "2027-02-01"}
+
+    first = client.post(f"{url}/statements/2027-01/payments", headers=ana, json=payment)
+    too_much = client.post(f"{url}/statements/2027-01/payments", headers=ana, json=payment)
+    rest = payment | {"amount": "200"}
+    client.post(f"{url}/statements/2027-01/payments", headers=ana, json=rest)
+    january = client.get(f"{url}/statements/2027-01", headers=ana).json()
+
+    assert (first.status_code, first.json()["closing_date"]) == (201, "2027-01-25")
+    assert too_much.status_code == 422
+    assert "200.00" in too_much.json()["detail"]
+    assert (january["paid_ars"], january["pending_ars"]) == ("500.00", "0.00")
+    assert [i["number"] for i in client.get(f"{url}/installments", headers=ana).json()] == [2]
+    # El pago sale de la cuenta: 800 - 500.
+    assert client.get(f"/accounts/{account}", headers=ana).json()["balance"] == "300.00"
