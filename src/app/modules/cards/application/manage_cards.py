@@ -6,7 +6,12 @@ from typing import Protocol
 from uuid import UUID
 
 from app.modules.cards.domain.card import CreditCard, CreditCardRepository
-from app.modules.cards.domain.purchase import CardPurchase, Installment, PurchaseRepository
+from app.modules.cards.domain.purchase import (
+    CardPurchase,
+    Installment,
+    PurchaseRepository,
+    Statement,
+)
 from app.shared.application.unit_of_work import UnitOfWork
 
 
@@ -69,3 +74,17 @@ class PendingInstallments:
             # 404 si la tarjeta no existe o es de otro usuario.
             await self.uow.cards.get_card(card_id)
             return await self.uow.purchases.pending_installments(card_id, today)
+
+
+@dataclass(frozen=True)
+class GetStatement:
+    uow: CardsUnitOfWork
+
+    async def __call__(self, card_id: UUID, year: int, month: int) -> Statement:
+        """El resumen que cierra en ese mes, aunque no tenga consumos."""
+        async with self.uow:
+            card = await self.uow.cards.get_card(card_id)
+            # Una compra del día 1 entra en el resumen que cierra ese mes.
+            closing, due = card.statement(date(year, month, 1))
+            items = await self.uow.purchases.statement_installments(card_id, closing)
+        return Statement(closing, due, items)

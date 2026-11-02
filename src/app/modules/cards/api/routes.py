@@ -6,13 +6,14 @@ from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Path, Request, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.cards.application.manage_cards import (
     CreateCard,
     GetCard,
+    GetStatement,
     ListCards,
     PendingInstallments,
     RegisterPurchase,
@@ -74,6 +75,16 @@ class InstallmentResponse(BaseModel):
     # Cierre y vencimiento del resumen en el que entra la cuota.
     closing_date: date
     due_date: date
+    purchase_date: date
+
+
+class StatementResponse(BaseModel):
+    period: str
+    closing_date: date
+    due_date: date
+    items: list[InstallmentResponse]
+    total_ars: Decimal
+    total_usd: Decimal
 
 
 def get_cards_uow(
@@ -163,3 +174,29 @@ async def pending_installments(
     today = datetime.now(ZoneInfo(request.app.state.settings.fx_timezone)).date()
     pending = await PendingInstallments(uow=uow)(card_id, today)
     return [InstallmentResponse.model_validate(i) for i in pending]
+
+
+@router.get(
+    "/{card_id}/statements/{period}",
+    summary="Resumen de un período",
+    description=(
+        "El período es el mes de cierre (AAAA-MM): consumos y cuotas que entran en ese resumen, "
+        "con los totales en pesos y en dólares, el cierre y el vencimiento."
+    ),
+    responses={status.HTTP_404_NOT_FOUND: {"description": "La tarjeta no existe"}},
+)
+async def get_statement(
+    card_id: UUID,
+    period: Annotated[str, Path(pattern=r"^\d{4}-(0[1-9]|1[0-2])$", examples=["2026-11"])],
+    uow: CardsUow,
+) -> StatementResponse:
+    year, month = (int(part) for part in period.split("-"))
+    statement = await GetStatement(uow=uow)(card_id, year, month)
+    return StatementResponse(
+        period=period,
+        closing_date=statement.closing_date,
+        due_date=statement.due_date,
+        items=[InstallmentResponse.model_validate(i) for i in statement.items],
+        total_ars=statement.total(Currency.ARS),
+        total_usd=statement.total(Currency.USD),
+    )

@@ -18,6 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import ColumnElement
 
 from app.modules.cards.domain.card import CardNetwork, CreditCard
 from app.modules.cards.domain.purchase import CardPurchase, Installment
@@ -149,13 +150,13 @@ class SqlAlchemyPurchaseRepository(UserScopedRepository[CardPurchaseModel]):
         )
         await self.session.flush()
 
-    async def pending_installments(self, card_id: UUID, today: date) -> list[Installment]:
+    async def _installments(self, card_id: UUID, *where: ColumnElement[bool]) -> list[Installment]:
         i, p = CardInstallmentModel, CardPurchaseModel
         query = (
-            select(i, p.description, p.installments)
+            select(i, p.description, p.installments, p.date)
             .join(p, p.id == i.purchase_id)
-            .where(i.user_id == self.user_id, i.card_id == card_id, i.due_date >= today)
-            .order_by(i.due_date, p.date, i.number)
+            .where(i.user_id == self.user_id, i.card_id == card_id, *where)
+            .order_by(i.due_date, p.date, p.created_at, i.number)
         )
         return [
             Installment(
@@ -167,9 +168,16 @@ class SqlAlchemyPurchaseRepository(UserScopedRepository[CardPurchaseModel]):
                 m.currency,
                 m.closing_date,
                 m.due_date,
+                bought,
             )
-            for m, description, count in (await self.session.execute(query)).all()
+            for m, description, count, bought in (await self.session.execute(query)).all()
         ]
+
+    async def pending_installments(self, card_id: UUID, today: date) -> list[Installment]:
+        return await self._installments(card_id, CardInstallmentModel.due_date >= today)
+
+    async def statement_installments(self, card_id: UUID, closing_date: date) -> list[Installment]:
+        return await self._installments(card_id, CardInstallmentModel.closing_date == closing_date)
 
 
 class SqlAlchemyCardsUnitOfWork(SqlAlchemyUnitOfWork):

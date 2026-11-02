@@ -4,7 +4,11 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.cards.application.manage_cards import PendingInstallments, RegisterPurchase
+from app.modules.cards.application.manage_cards import (
+    GetStatement,
+    PendingInstallments,
+    RegisterPurchase,
+)
 from app.modules.cards.domain.card import CardNetwork, CreditCard
 from app.modules.cards.domain.purchase import CardPurchase, InvalidPurchaseError
 from app.shared.domain.money import Currency
@@ -79,3 +83,33 @@ async def test_pending_installments_are_those_not_yet_due() -> None:
         (2, date(2026, 11, 5)),
         (3, date(2026, 12, 5)),
     ]
+
+
+async def test_the_statement_of_a_month_has_its_items_and_totals_per_currency() -> None:
+    uow = FakeCardsUnitOfWork()
+    amex = CreditCard(ANA, "Amex", CardNetwork.AMEX, 25, 5, dual_currency=True)
+    uow.cards.items.append(amex)
+    for amount, count, on, currency in (
+        ("1000", 3, date(2026, 10, 20), Currency.ARS),
+        ("12.99", 1, date(2026, 11, 3), Currency.USD),
+    ):
+        purchase = CardPurchase(ANA, amex.id, "Compra", Decimal(amount), currency, count, on)
+        await RegisterPurchase(uow)(purchase)
+
+    november = await GetStatement(uow)(amex.id, 2026, 11)
+    empty = await GetStatement(uow)(amex.id, 2027, 5)
+
+    assert (november.closing_date, november.due_date) == (date(2026, 11, 25), date(2026, 12, 5))
+    assert [(i.number, i.count, i.purchase_date) for i in november.items] == [
+        (2, 3, date(2026, 10, 20)),
+        (1, 1, date(2026, 11, 3)),
+    ]
+    assert (november.total(Currency.ARS), november.total(Currency.USD)) == (
+        Decimal("333.33"),
+        Decimal("12.99"),
+    )
+    assert (empty.items, empty.total(Currency.ARS), empty.closing_date) == (
+        [],
+        Decimal("0.00"),
+        date(2027, 5, 25),
+    )

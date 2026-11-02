@@ -36,6 +36,12 @@ class InMemoryPurchases:
         rows = [(p, i) for c, p, i in self.installments if c == card_id and i.due_date >= today]
         return [i for _, i in sorted(rows, key=lambda r: (r[1].due_date, r[0].date, r[1].number))]
 
+    async def statement_installments(self, card_id: UUID, closing_date: date) -> list[Installment]:
+        rows = [
+            i for c, _, i in self.installments if c == card_id and i.closing_date == closing_date
+        ]
+        return sorted(rows, key=lambda i: (i.purchase_date, i.number))
+
 
 class FakeCardsUnitOfWork:
     def __init__(self) -> None:
