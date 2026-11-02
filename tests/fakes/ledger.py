@@ -7,6 +7,7 @@ from typing import Self
 from uuid import UUID
 
 from app.modules.ledger.domain.category import Category, CategoryKind
+from app.modules.ledger.domain.recurring import RecurringRule
 from app.modules.ledger.domain.transaction import Transaction, TransactionFilter
 from app.shared.domain.errors import NotFoundError
 from fakes.accounts import InMemoryAccounts
@@ -97,11 +98,34 @@ class InMemoryTransactions:
         return totals
 
 
+class InMemoryRecurring:
+    def __init__(self) -> None:
+        self.items: dict[UUID, RecurringRule] = {}
+
+    async def add(self, rule: RecurringRule) -> None:
+        self.items[rule.id] = rule
+
+    async def list_rules(self) -> list[RecurringRule]:
+        return sorted(self.items.values(), key=lambda r: r.start_date)
+
+    async def get_rule(self, rule_id: UUID) -> RecurringRule:
+        if rule_id not in self.items:
+            raise NotFoundError("El recurso no existe")
+        return self.items[rule_id]
+
+    async def save(self, rule: RecurringRule) -> None:
+        self.items[rule.id] = rule
+
+    async def delete(self, rule_id: UUID) -> None:
+        del self.items[rule_id]
+
+
 class FakeLedgerUnitOfWork:
     def __init__(self) -> None:
         self.accounts = InMemoryAccounts()
         self.categories = InMemoryCategories()
         self.transactions = InMemoryTransactions()
+        self.recurring = InMemoryRecurring()
         self.commits = 0
         self._saved: list[Transaction] = []
 
