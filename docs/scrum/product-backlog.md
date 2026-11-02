@@ -550,7 +550,7 @@ _Préstamos y deudas con cronograma de pagos._
 _Movimientos recurrentes y presupuestos mensuales por categoría._
 
 ### US-043 - Reglas de movimientos recurrentes
-`Story` | **3 SP** | Prioridad **Medium** | Sprint 10 | label `planning`
+`Story` | **3 SP** | Prioridad **Medium** | Sprint 11 | label `planning`
 
 **Como** usuario, **quiero** definir ingresos y gastos recurrentes, **para** no cargar todos los meses lo mismo.
 
@@ -559,7 +559,7 @@ _Movimientos recurrentes y presupuestos mensuales por categoría._
 - [ ] Fecha de inicio y fin opcional; pausar/reanudar
 
 ### US-044 - Generación automática de recurrentes
-`Story` | **3 SP** | Prioridad **Medium** | Sprint 10 | label `planning`
+`Story` | **3 SP** | Prioridad **Medium** | Sprint 11 | label `planning`
 
 **Como** usuario, **quiero** que los recurrentes se registren solos, **para** mantener mis datos al día.
 
@@ -568,7 +568,7 @@ _Movimientos recurrentes y presupuestos mensuales por categoría._
 - [ ] Opción de generar como 'pendiente de confirmar'
 
 ### US-045 - Presupuestos mensuales
-`Story` | **3 SP** | Prioridad **Medium** | Sprint 11 | label `planning`
+`Story` | **3 SP** | Prioridad **Medium** | Sprint 12 | label `planning`
 
 **Como** usuario, **quiero** definir un presupuesto mensual por categoría, **para** controlar mis gastos.
 
@@ -577,7 +577,7 @@ _Movimientos recurrentes y presupuestos mensuales por categoría._
 - [ ] Copiar presupuestos del mes anterior
 
 ### US-046 - Estado del presupuesto y alertas
-`Story` | **3 SP** | Prioridad **Medium** | Sprint 11 | label `planning`
+`Story` | **3 SP** | Prioridad **Medium** | Sprint 12 | label `planning`
 
 **Como** usuario, **quiero** ver cuánto consumi de cada presupuesto, **para** no pasarme.
 
