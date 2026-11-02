@@ -84,3 +84,26 @@ def test_purchases_in_installments_and_the_pending_ones(
     assert pending == created.json()
     assert dollars.status_code == 422
     assert client.get(f"{url}/installments", headers=sign_up()).status_code == 404
+
+
+def test_the_statement_of_a_period(
+    client: TestClient, sign_up: Callable[[], dict[str, str]]
+) -> None:
+    ana = sign_up()
+    body = {"name": "Visa", "network": "VISA", "closing_day": 31, "due_day": 10}
+    url = f"/credit-cards/{client.post('/credit-cards', headers=ana, json=body).json()['id']}"
+    for description, day in (("Tele", "2027-01-15"), ("Libro", "2027-02-01")):
+        purchase = {"description": description, "amount": "1000", "installments": 2, "date": day}
+        client.post(f"{url}/purchases", headers=ana, json=purchase)
+
+    february = client.get(f"{url}/statements/2027-02", headers=ana).json()
+
+    # Cierre el 31: en febrero, su último día.
+    assert (february["closing_date"], february["due_date"]) == ("2027-02-28", "2027-03-10")
+    assert [(i["description"], i["number"]) for i in february["items"]] == [
+        ("Tele", 2),
+        ("Libro", 1),
+    ]
+    assert (february["total_ars"], february["total_usd"]) == ("1000.00", "0.00")
+    assert client.get(f"{url}/statements/2027-13", headers=ana).status_code == 422
+    assert client.get(f"{url}/statements/2027-02", headers=sign_up()).status_code == 404

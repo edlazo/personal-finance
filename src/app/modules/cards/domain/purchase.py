@@ -27,6 +27,19 @@ class Installment:
     currency: Currency
     closing_date: date
     due_date: date
+    purchase_date: date
+
+
+@dataclass(frozen=True)
+class Statement:
+    """El resumen que cierra en un mes: sus consumos y cuotas, y lo que hay que pagar."""
+
+    closing_date: date
+    due_date: date
+    items: list[Installment]
+
+    def total(self, currency: Currency) -> Decimal:
+        return sum((i.amount for i in self.items if i.currency is currency), Decimal("0.00"))
 
 
 @dataclass
@@ -71,6 +84,7 @@ class CardPurchase:
                 first if number == 1 else rest,
                 self.currency,
                 *card.statement(self.date, number - 1),
+                self.date,
             )
             for number in range(1, self.installments + 1)
         ]
@@ -81,4 +95,8 @@ class PurchaseRepository(Protocol):
 
     async def pending_installments(self, card_id: UUID, today: date) -> list[Installment]:
         """Decisión del PO: las cuotas de resúmenes que todavía no vencieron."""
+        ...
+
+    async def statement_installments(self, card_id: UUID, closing_date: date) -> list[Installment]:
+        """Las cuotas del resumen que cierra ese día, por fecha de compra."""
         ...
