@@ -10,6 +10,7 @@ from app.modules.cards.application.manage_cards import (
     RegisterPurchase,
 )
 from app.modules.cards.domain.card import CardNetwork, CreditCard
+from app.modules.cards.domain.payment import CardPayment
 from app.modules.cards.domain.purchase import CardPurchase, InvalidPurchaseError
 from app.shared.domain.money import Currency
 from fakes.cards import FakeCardsUnitOfWork
@@ -71,18 +72,21 @@ def test_invalid_purchases_are_rejected(amount: str, count: int) -> None:
         buy(amount, count, date(2026, 10, 1))
 
 
-async def test_pending_installments_are_those_not_yet_due() -> None:
+async def test_pending_installments_are_those_of_statements_not_fully_paid() -> None:
     uow = FakeCardsUnitOfWork()
     uow.cards.items.append(VISA)
     await RegisterPurchase(uow)(buy("300", 3, date(2026, 9, 10)))
+    for closing, amount in ((date(2026, 9, 25), "100"), (date(2026, 10, 25), "50")):
+        await uow.payments.add(
+            CardPayment(
+                ANA, VISA.id, uuid4(), closing, Decimal(amount), Currency.ARS, date(2026, 10, 1)
+            )
+        )
 
-    pending = await PendingInstallments(uow)(VISA.id, today=date(2026, 10, 6))
+    pending = await PendingInstallments(uow)(VISA.id)
 
-    # La 1 venció el 05/10; la 2 cerró el 25/10 y vence el 05/11.
-    assert [(i.number, i.due_date) for i in pending] == [
-        (2, date(2026, 11, 5)),
-        (3, date(2026, 12, 5)),
-    ]
+    # La 1 está pagada; la 2, solo en parte; la 3, nada.
+    assert [i.number for i in pending] == [2, 3]
 
 
 async def test_the_statement_of_a_month_has_its_items_and_totals_per_currency() -> None:

@@ -4,7 +4,6 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Path, Request, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -88,10 +87,12 @@ class StatementResponse(BaseModel):
 
 
 def get_cards_uow(
+    request: Request,
     user_id: CurrentUserId,
     session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
 ) -> SqlAlchemyCardsUnitOfWork:
-    return SqlAlchemyCardsUnitOfWork(session_factory, user_id)
+    # app.state.cash_movements: implementación de ledger que conecta main.py (contrato de shared).
+    return SqlAlchemyCardsUnitOfWork(session_factory, user_id, request.app.state.cash_movements)
 
 
 CardsUow = Annotated[SqlAlchemyCardsUnitOfWork, Depends(get_cards_uow)]
@@ -165,14 +166,11 @@ async def register_purchase(
 @router.get(
     "/{card_id}/installments",
     summary="Cuotas pendientes de una tarjeta",
-    description="Las de resúmenes que todavía no vencieron, por fecha de vencimiento.",
+    description="Las de resúmenes sin pagar completos en su moneda, por vencimiento.",
     responses={status.HTTP_404_NOT_FOUND: {"description": "La tarjeta no existe"}},
 )
-async def pending_installments(
-    card_id: UUID, request: Request, uow: CardsUow
-) -> list[InstallmentResponse]:
-    today = datetime.now(ZoneInfo(request.app.state.settings.fx_timezone)).date()
-    pending = await PendingInstallments(uow=uow)(card_id, today)
+async def pending_installments(card_id: UUID, uow: CardsUow) -> list[InstallmentResponse]:
+    pending = await PendingInstallments(uow=uow)(card_id)
     return [InstallmentResponse.model_validate(i) for i in pending]
 
 

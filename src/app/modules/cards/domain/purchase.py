@@ -37,9 +37,14 @@ class Statement:
     closing_date: date
     due_date: date
     items: list[Installment]
+    paid: dict[Currency, Decimal] = field(default_factory=dict)
 
     def total(self, currency: Currency) -> Decimal:
         return sum((i.amount for i in self.items if i.currency is currency), Decimal("0.00"))
+
+    def pending(self, currency: Currency) -> Decimal:
+        """Decisión del PO: un pago parcial deja este saldo; nunca se paga de más."""
+        return self.total(currency) - self.paid.get(currency, Decimal("0.00"))
 
 
 @dataclass
@@ -93,8 +98,8 @@ class CardPurchase:
 class PurchaseRepository(Protocol):
     async def add(self, purchase: CardPurchase, installments: list[Installment]) -> None: ...
 
-    async def pending_installments(self, card_id: UUID, today: date) -> list[Installment]:
-        """Decisión del PO: las cuotas de resúmenes que todavía no vencieron."""
+    async def card_installments(self, card_id: UUID) -> list[Installment]:
+        """Todas las cuotas de la tarjeta, por fecha de vencimiento."""
         ...
 
     async def statement_installments(self, card_id: UUID, closing_date: date) -> list[Installment]:

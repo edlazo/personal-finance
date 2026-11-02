@@ -9,6 +9,7 @@ from app.modules.cards.domain.card import CardNetwork, CreditCard
 from app.modules.cards.infrastructure.persistence import SqlAlchemyCardsUnitOfWork
 from app.modules.identity.domain.user import User
 from app.modules.identity.infrastructure.persistence import SqlAlchemyIdentityUnitOfWork
+from app.modules.ledger.infrastructure.cash_movements import LedgerCashMovements
 from app.shared.domain.errors import NotFoundError
 from app.shared.infrastructure.database import create_session_factory
 
@@ -27,9 +28,11 @@ async def test_cards_are_stored_per_user(migrated_database_url: str, engine: Asy
 
     ana, beto = await new_user(), await new_user()
     card = CreditCard(ana, "Visa", CardNetwork.VISA, 31, 10, True, Decimal("800000.50"))
-    await CreateCard(SqlAlchemyCardsUnitOfWork(factory, ana))(card)
+    await CreateCard(SqlAlchemyCardsUnitOfWork(factory, ana, LedgerCashMovements))(card)
 
-    assert await GetCard(SqlAlchemyCardsUnitOfWork(factory, ana))(card.id) == card
-    assert await ListCards(SqlAlchemyCardsUnitOfWork(factory, beto))() == []
+    assert (
+        await GetCard(SqlAlchemyCardsUnitOfWork(factory, ana, LedgerCashMovements))(card.id) == card
+    )
+    assert await ListCards(SqlAlchemyCardsUnitOfWork(factory, beto, LedgerCashMovements))() == []
     with pytest.raises(NotFoundError):
-        await GetCard(SqlAlchemyCardsUnitOfWork(factory, beto))(card.id)
+        await GetCard(SqlAlchemyCardsUnitOfWork(factory, beto, LedgerCashMovements))(card.id)
