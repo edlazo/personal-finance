@@ -1,7 +1,5 @@
 from collections.abc import Callable, Iterator
-from datetime import datetime
 from uuid import uuid4
-from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -64,14 +62,9 @@ def test_purchases_in_installments_and_the_pending_ones(
     body = {"name": "Visa", "network": "VISA", "closing_day": 25, "due_day": 5}
     card = client.post("/credit-cards", headers=ana, json=body).json()["id"]
     url = f"/credit-cards/{card}"
-    # La misma zona horaria con la que el endpoint decide qué venció.
-    today = datetime.now(ZoneInfo("America/Argentina/Buenos_Aires")).date().isoformat()
-    tv = {"description": "Tele", "amount": "1000", "installments": 3, "date": today}
+    tv = {"description": "Tele", "amount": "1000", "installments": 3, "date": "2026-10-20"}
 
     created = client.post(f"{url}/purchases", headers=ana, json=tv)
-    client.post(
-        f"{url}/purchases", headers=ana, json=tv | {"installments": 1, "date": "2020-01-10"}
-    )
     dollars = client.post(f"{url}/purchases", headers=ana, json=tv | {"currency": "USD"})
     pending = client.get(f"{url}/installments", headers=ana).json()
 

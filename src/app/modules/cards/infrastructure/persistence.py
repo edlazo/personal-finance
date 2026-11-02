@@ -1,5 +1,6 @@
 """Tabla, repositorio y Unit of Work de las tarjetas de crédito."""
 
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Self
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     SmallInteger,
     String,
+    func,
     select,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -21,7 +23,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import ColumnElement
 
 from app.modules.cards.domain.card import CardNetwork, CreditCard
+from app.modules.cards.domain.payment import CardPayment
 from app.modules.cards.domain.purchase import CardPurchase, Installment
+from app.shared.domain.cash import CashMovements
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import Base
 from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -173,23 +177,82 @@ class SqlAlchemyPurchaseRepository(UserScopedRepository[CardPurchaseModel]):
             for m, description, count, bought in (await self.session.execute(query)).all()
         ]
 
-    async def pending_installments(self, card_id: UUID, today: date) -> list[Installment]:
-        return await self._installments(card_id, CardInstallmentModel.due_date >= today)
+    async def card_installments(self, card_id: UUID) -> list[Installment]:
+        return await self._installments(card_id)
 
     async def statement_installments(self, card_id: UUID, closing_date: date) -> list[Installment]:
         return await self._installments(card_id, CardInstallmentModel.closing_date == closing_date)
 
 
+class CardPaymentModel(UserOwnedMixin, Base):
+    __tablename__ = "card_payments"
+
+    card_id: Mapped[UUID] = mapped_column(ForeignKey("credit_cards.id"), index=True)
+    account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.id"))
+    closing_date: Mapped[date] = mapped_column(Date)
+    amount: Mapped[Decimal] = mapped_column(Numeric(20, 2))
+    currency: Mapped[Currency] = mapped_column(
+        Enum(Currency, name="currency", native_enum=False, length=3)
+    )
+    date: Mapped[date] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SqlAlchemyPaymentRepository(UserScopedRepository[CardPaymentModel]):
+    model = CardPaymentModel
+
+    async def add(self, payment: CardPayment) -> None:
+        self.session.add(
+            CardPaymentModel(
+                id=payment.id,
+                user_id=payment.user_id,
+                card_id=payment.card_id,
+                account_id=payment.account_id,
+                closing_date=payment.closing_date,
+                amount=payment.amount,
+                currency=payment.currency,
+                date=payment.date,
+                created_at=payment.created_at,
+            )
+        )
+        await self.session.flush()
+
+    async def paid(self, card_id: UUID) -> dict[tuple[date, Currency], Decimal]:
+        m = CardPaymentModel
+        query = (
+            select(m.closing_date, m.currency, func.sum(m.amount))
+            .where(m.user_id == self.user_id, m.card_id == card_id)
+            .group_by(m.closing_date, m.currency)
+        )
+        rows = (await self.session.execute(query)).all()
+        return {(closing, currency): total for closing, currency, total in rows}
+
+
+# Lo arma main.py con la implementación de ledger (contrato de app.shared).
+CashMovementsFactory = Callable[[AsyncSession, UUID], CashMovements]
+
+
 class SqlAlchemyCardsUnitOfWork(SqlAlchemyUnitOfWork):
     cards: SqlAlchemyCreditCardRepository
     purchases: SqlAlchemyPurchaseRepository
+    payments: SqlAlchemyPaymentRepository
+    cash: CashMovements
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], user_id: UUID) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        user_id: UUID,
+        cash: CashMovementsFactory,
+    ) -> None:
         super().__init__(session_factory)
         self._user_id = user_id
+        self._cash = cash
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
         self.cards = SqlAlchemyCreditCardRepository(self.session, self._user_id)
         self.purchases = SqlAlchemyPurchaseRepository(self.session, self._user_id)
+        self.payments = SqlAlchemyPaymentRepository(self.session, self._user_id)
+        # Misma sesión: el pago y su movimiento en la cuenta se confirman juntos.
+        self.cash = self._cash(self.session, self._user_id)
         return self
