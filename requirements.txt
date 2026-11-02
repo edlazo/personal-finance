@@ -7,7 +7,7 @@
 # --- Framework web ---------------------------------------------------------
 # El extra [standard] incluye fastapi-cli (`fastapi dev` / `fastapi run`) y el
 # servidor ASGI uvicorn. No se declara ni se invoca uvicorn directamente.
-fastapi[standard]==0.156.2
+fastapi[standard]==0.161.1
 pydantic==2.14.1
 pydantic-settings==2.16.1
 email-validator==2.3.0
@@ -16,7 +16,7 @@ python-multipart==0.0.32
 # --- Base de datos (PostgreSQL 17) ----------------------------------------
 sqlalchemy[asyncio]==2.1.5
 asyncpg==0.32.0
-alembic==1.20.0
+alembic==1.20.1
 
 # --- Seguridad --------------------------------------------------------------
 pyjwt==2.15.1
@@ -27,7 +27,7 @@ cryptography==50.0.2
 # httpx2 (pydantic/httpx2, verificado en PyPI el 2026-10-05) reemplaza a httpx:
 # starlette depreca el TestClient sobre httpx. httpx sigue instalado como
 # dependencia transitiva de fastapi[standard], pero el codigo no lo importa.
-httpx2==2.13.1
+httpx2==2.16.0
 tenacity==9.2.1
 
 # --- Jobs programados (cotizaciones, recurrentes, snapshots) ----------------

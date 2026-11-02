@@ -35,6 +35,8 @@ def test_refresh_rotates_and_the_old_token_stops_working(
     client: TestClient, refresh_token: str
 ) -> None:
     rotated = client.post("/auth/refresh")
+    # Solo la cookie vieja: sin clear(), httpx2 2.16 manda también la nueva y el server lee esa.
+    client.cookies.clear()
     client.cookies.set("refresh_token", refresh_token)
     reused = client.post("/auth/refresh")
 
@@ -46,8 +48,10 @@ def test_refresh_rotates_and_the_old_token_stops_working(
 
 def test_logout_revokes_the_refresh_token(client: TestClient, refresh_token: str) -> None:
     first = client.post("/auth/logout")
+    client.cookies.clear()
     client.cookies.set("refresh_token", refresh_token)
     again = client.post("/auth/logout")
+    client.cookies.clear()
     client.cookies.set("refresh_token", refresh_token)
     after = client.post("/auth/refresh")
 
