@@ -16,13 +16,13 @@ Sprints de **2 semanas**. Capacidad estimada: **~13 SP por sprint** (unas 17 h n
 | 7 | — (2026-10-25) | Comprar o vender dólares y seguir la cartera de inversiones con posiciones y P&L | US-020, 026, 027, 028 | 16 | — |
 | 8 | — (2026-10-26) | Precios manuales, rentas, credenciales seguras, cripto automática y saldo no negativo | US-029, 030, 031, 032, 035, 062 | 16 | — |
 | 9 | — (2026-10-27) | Valuar la cartera de IOL automáticamente y empezar a seguir las tarjetas de crédito | US-033, 034, 037, 038 | 15 | **v0.2.0** |
-| 10 | 3–4 | Saber cuánto debo en cada tarjeta y cada deuda, y registrar sus pagos | US-039, 040, 041, 042 | 14 | — |
-| 11 | 5–6 | Movimientos recurrentes automáticos | US-043, 044 | 6 | **v0.3.0** |
-| 12 | 7–8 | Presupuestos, patrimonio neto y flujo de fondos | US-045, 046, 047, 048 | 14 | — |
-| 13 | 9–10 | Reportes históricos, hardening y salida a producción | US-049, 050, 051, 052, 054 | 14 | **v1.0.0** |
+| 10 | — (2026-11-02) | Saber cuánto debo en cada tarjeta y cada deuda, y registrar sus pagos | US-039, 040, 041, 042 | 14 | — |
+| 11 | 3–4 | Que los movimientos recurrentes se registren solos y ver mi patrimonio neto y mi flujo de fondos | US-043, 044, 047, 048 | 14 | **v0.3.0** |
+| 12 | 5–6 | Presupuestos mensuales | US-045, 046 | 6 | — |
+| 13 | 7–8 | Reportes históricos, hardening y salida a producción | US-049, 050, 051, 052, 054 | 14 | **v1.0.0** |
 | Futuro | — | Bienes (inmuebles, vehículos) | US-055, 056 | 8 | v1.1.0 |
 
-**Total v1.0:** 177 SP en 13 sprints, unas 10 semanas desde el inicio del Sprint 1. US-062 entra en el Sprint 8; US-063 (1 SP) sigue sin sprint asignado.
+**Total v1.0:** 177 SP en 13 sprints, unas 8 semanas desde el inicio del Sprint 1. US-062 entra en el Sprint 8; US-063 (1 SP) sigue sin sprint asignado.
 
 > **2026-10-23 (Planning del Sprint 2):** entra la épica PF-E12 Frontend; el PO prioriza el dashboard, así que todo el roadmap desde Identity se corre un sprint.
 >
@@ -41,13 +41,15 @@ Sprints de **2 semanas**. Capacidad estimada: **~13 SP por sprint** (unas 17 h n
 > **2026-10-26 (Review del Sprint 8):** el Sprint 8 se completó el día de su inicio (16 SP). El Sprint 9 toma sus fechas (26/10 → 06/11) y suma US-037 y US-038 de tarjetas (15 SP); el Sprint 10 queda en 6 SP y se re-planifica en su Planning. v0.2.0 al cierre del Sprint 9.
 >
 > **2026-10-27 (Review del Sprint 9):** el Sprint 9 se completó al día siguiente de su inicio (15 SP) y sale **v0.2.0**. El Sprint 10 toma sus fechas (27/10 → 06/11) y suma US-041 y US-042 de deudas (14 SP); el Sprint 11 queda en 6 SP y se re-planifica en su Planning. v0.3.0 al cierre del Sprint 11.
+>
+> **2026-11-02 (Review del Sprint 10):** el Sprint 10 se completó cuatro días antes de su fin (14 SP). El Sprint 11 toma los días que le quedaban (02/11 → 06/11) y adelanta el patrimonio neto y el flujo de fondos (US-047 y US-048, 14 SP); los presupuestos pasan al Sprint 12, que queda en 6 SP y se re-planifica en su Planning. v0.3.0 al cierre del Sprint 11.
 
 ## Releases
 | Versión | Contenido | Valor para el usuario |
 |---|---|---|
 | v0.1.0 MVP (2026-10-25) | Auth, cuentas, movimientos, transferencias, cotizaciones | Registrar el día a día y ver el total en ARS/USD |
 | v0.2.0 (2026-10-27) | Inversiones, integraciones de mercado (IOL, data912, CoinGecko) y primeras tarjetas | Cartera valuada automáticamente |
-| v0.3.0 | Tarjetas, deudas, recurrentes | Visión completa de pasivos y compromisos |
+| v0.3.0 | Tarjetas, deudas, recurrentes, patrimonio neto y flujo de fondos | Visión completa de pasivos y compromisos |
 | v1.0.0 | Presupuestos, reportes, hardening | Producto completo listo para producción |
 
 ## Riesgos
