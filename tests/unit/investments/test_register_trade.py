@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -8,8 +8,9 @@ from app.modules.investments.application.register_trade import RegisterTrade
 from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
 from app.modules.investments.domain.trade import InvalidTradeError, TradeSide
 from app.shared.domain.cash import CashAccount
+from app.shared.domain.errors import DomainError
 from app.shared.domain.money import Currency
-from fakes.investments import FakeInvestmentsUnitOfWork
+from fakes.investments import FakeCash, FakeInvestmentsUnitOfWork
 
 USER = uuid4()
 BUY, SELL = TradeSide.BUY, TradeSide.SELL
@@ -83,3 +84,30 @@ async def test_trade_rules() -> None:
     with pytest.raises(InvalidTradeError, match="archivada"):
         await trade(uow, closed, ggal, BUY, "1", "100")
     assert len(uow.trades.items) == 1
+
+
+class RejectingCash(FakeCash):
+    """Como ledger cuando el movimiento dejaría la cuenta en negativo."""
+
+    async def record_trade(
+        self,
+        account_id: UUID,
+        amount: Decimal,
+        *,
+        incoming: bool,
+        on: date,
+        trade_id: UUID,
+        description: str,
+    ) -> None:
+        raise DomainError("La cuenta quedaría con saldo negativo")
+
+
+async def test_a_trade_whose_cash_movement_fails_is_not_kept() -> None:
+    uow, broker, ggal, _ = setup()
+    uow.cash = RejectingCash()
+    uow.cash.accounts[broker.id] = broker
+
+    with pytest.raises(DomainError):
+        await trade(uow, broker, ggal, BUY, "10", "6500")
+
+    assert await uow.trades.list_trades() == []
