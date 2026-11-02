@@ -9,7 +9,7 @@
 # servidor ASGI uvicorn. No se declara ni se invoca uvicorn directamente.
 fastapi[standard]==0.161.1
 pydantic==2.14.1
-pydantic-settings==2.16.1
+pydantic-settings==2.16.2
 email-validator==2.3.0
 python-multipart==0.0.32
 
