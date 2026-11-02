@@ -6,6 +6,7 @@ import pytest
 
 from app.modules.debts.application.manage_debts import CreateDebt, GetDebt, ListDebts
 from app.modules.debts.domain.debt import Debt, DebtDirection, InvalidDebtError, add_months
+from app.modules.debts.domain.payment import DebtBalance
 from app.shared.domain.money import Currency
 from fakes.debts import FakeDebtsUnitOfWork
 
@@ -87,8 +88,9 @@ async def test_debts_are_saved_with_their_schedule() -> None:
 
     created = await CreateDebt(uow)(loan)
 
-    assert await ListDebts(uow)() == [loan]
-    assert await GetDebt(uow)(loan.id) == (loan, created)
+    nothing_paid = DebtBalance(Decimal("0.00"), Decimal("1000.00"), 0, created[0])
+    assert await ListDebts(uow)() == [(loan, nothing_paid)]
+    assert await GetDebt(uow)(loan.id) == (loan, created, nothing_paid)
     assert uow.commits == 1
 
 

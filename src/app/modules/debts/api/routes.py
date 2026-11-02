@@ -5,12 +5,18 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.debts.application.manage_debts import CreateDebt, GetDebt, ListDebts
-from app.modules.debts.domain.debt import MAX_INSTALLMENTS, Debt, DebtDirection
+from app.modules.debts.application.manage_debts import (
+    CreateDebt,
+    GetDebt,
+    ListDebts,
+    RegisterDebtPayment,
+)
+from app.modules.debts.domain.debt import MAX_INSTALLMENTS, Debt, DebtDirection, DebtInstallment
+from app.modules.debts.domain.payment import DebtBalance, DebtPayment
 from app.modules.debts.infrastructure.persistence import SqlAlchemyDebtsUnitOfWork
 from app.shared.api.auth import CurrentUserId
 from app.shared.api.dependencies import get_session_factory
@@ -42,6 +48,11 @@ class InstallmentResponse(BaseModel):
     interest: Decimal
 
 
+class ScheduledInstallmentResponse(InstallmentResponse):
+    # Cubierta entera por los pagos, aplicados a las cuotas en orden.
+    paid: bool
+
+
 class DebtResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,17 +66,39 @@ class DebtResponse(BaseModel):
     annual_rate: Decimal | None
     fixed_installment: Decimal | None
     created_at: datetime
+    paid: Decimal
+    # Lo que falta pagar, con el interés de las cuotas que quedan.
+    pending: Decimal
+    next_installment: InstallmentResponse | None
 
 
 class DebtDetailResponse(DebtResponse):
-    schedule: list[InstallmentResponse]
+    schedule: list[ScheduledInstallmentResponse]
+
+
+class RegisterPaymentRequest(BaseModel):
+    account_id: UUID
+    amount: Decimal = Field(gt=0, max_digits=20, decimal_places=2)
+    date: date
+
+
+class PaymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    debt_id: UUID
+    account_id: UUID
+    amount: Decimal
+    date: date
 
 
 def get_debts_uow(
+    request: Request,
     user_id: CurrentUserId,
     session_factory: Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)],
 ) -> SqlAlchemyDebtsUnitOfWork:
-    return SqlAlchemyDebtsUnitOfWork(session_factory, user_id)
+    # app.state.cash_movements: implementación de ledger que conecta main.py (contrato de shared).
+    return SqlAlchemyDebtsUnitOfWork(session_factory, user_id, request.app.state.cash_movements)
 
 
 DebtsUow = Annotated[SqlAlchemyDebtsUnitOfWork, Depends(get_debts_uow)]
@@ -77,10 +110,19 @@ router = APIRouter(
 )
 
 
-def _detail(debt: Debt, schedule: list[object]) -> DebtDetailResponse:
-    base = DebtResponse.model_validate(debt).model_dump()
+def _summary(debt: Debt, balance: DebtBalance) -> DebtResponse:
+    return DebtResponse.model_validate(vars(debt) | vars(balance), from_attributes=True)
+
+
+def _detail(
+    debt: Debt, schedule: list[DebtInstallment], balance: DebtBalance
+) -> DebtDetailResponse:
     return DebtDetailResponse(
-        **base, schedule=[InstallmentResponse.model_validate(i) for i in schedule]
+        **_summary(debt, balance).model_dump(),
+        schedule=[
+            ScheduledInstallmentResponse(**vars(i), paid=i.number <= balance.paid_installments)
+            for i in schedule
+        ],
     )
 
 
@@ -107,12 +149,17 @@ async def create_debt(
         body.annual_rate,
         body.fixed_installment,
     )
-    return _detail(debt, list(await CreateDebt(uow=uow)(debt)))
+    schedule = await CreateDebt(uow=uow)(debt)
+    return _detail(debt, schedule, DebtBalance.of(schedule, Decimal("0.00")))
 
 
-@router.get("", summary="Mis deudas y préstamos", description="Por fecha de inicio.")
+@router.get(
+    "",
+    summary="Mis deudas y préstamos",
+    description="Por fecha de inicio, con lo pagado, lo que falta pagar y la próxima cuota.",
+)
 async def list_debts(uow: DebtsUow) -> list[DebtResponse]:
-    return [DebtResponse.model_validate(d) for d in await ListDebts(uow=uow)()]
+    return [_summary(debt, balance) for debt, balance in await ListDebts(uow=uow)()]
 
 
 @router.get(
@@ -121,5 +168,22 @@ async def list_debts(uow: DebtsUow) -> list[DebtResponse]:
     responses={status.HTTP_404_NOT_FOUND: {"description": "La deuda no existe"}},
 )
 async def get_debt(debt_id: UUID, uow: DebtsUow) -> DebtDetailResponse:
-    debt, schedule = await GetDebt(uow=uow)(debt_id)
-    return _detail(debt, list(schedule))
+    return _detail(*await GetDebt(uow=uow)(debt_id))
+
+
+@router.post(
+    "/{debt_id}/payments",
+    status_code=status.HTTP_201_CREATED,
+    summary="Pagar una deuda o cobrar un préstamo",
+    description=(
+        "Monto libre que se aplica a las cuotas en orden. Sale (o entra, si es un préstamo) de "
+        "una cuenta activa en la moneda de la deuda, como un movimiento sin categoría. No puede "
+        "superar lo que falta pagar."
+    ),
+    responses={status.HTTP_404_NOT_FOUND: {"description": "La deuda o la cuenta no existe"}},
+)
+async def register_payment(
+    debt_id: UUID, body: RegisterPaymentRequest, user_id: CurrentUserId, uow: DebtsUow
+) -> PaymentResponse:
+    payment = DebtPayment(user_id, debt_id, body.account_id, body.amount, body.date)
+    return PaymentResponse.model_validate(await RegisterDebtPayment(uow=uow)(payment))

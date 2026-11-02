@@ -1,16 +1,32 @@
-"""Casos de uso: registrar, listar y ver deudas y préstamos."""
+"""Casos de uso: registrar, listar, ver y pagar deudas y préstamos."""
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
-from app.modules.debts.domain.debt import Debt, DebtInstallment, DebtRepository
+from app.modules.debts.domain.debt import Debt, DebtDirection, DebtInstallment, DebtRepository
+from app.modules.debts.domain.payment import (
+    DebtBalance,
+    DebtPayment,
+    InvalidPaymentError,
+    PaymentRepository,
+)
 from app.shared.application.unit_of_work import UnitOfWork
+from app.shared.domain.cash import CashMovements
+
+ZERO = Decimal("0.00")
 
 
 class DebtsUnitOfWork(UnitOfWork, Protocol):
     @property
     def debts(self) -> DebtRepository: ...
+
+    @property
+    def payments(self) -> PaymentRepository: ...
+
+    @property
+    def cash(self) -> CashMovements: ...
 
 
 @dataclass(frozen=True)
@@ -31,16 +47,54 @@ class CreateDebt:
 class ListDebts:
     uow: DebtsUnitOfWork
 
-    async def __call__(self) -> list[Debt]:
+    async def __call__(self) -> list[tuple[Debt, DebtBalance]]:
         async with self.uow:
-            return await self.uow.debts.list_debts()
+            paid = await self.uow.payments.paid()
+            # shortcut: una consulta de cuotas por deuda; agruparlas si alguien tiene cientos.
+            return [
+                (d, DebtBalance.of(await self.uow.debts.installments(d.id), paid.get(d.id, ZERO)))
+                for d in await self.uow.debts.list_debts()
+            ]
 
 
 @dataclass(frozen=True)
 class GetDebt:
     uow: DebtsUnitOfWork
 
-    async def __call__(self, debt_id: UUID) -> tuple[Debt, list[DebtInstallment]]:
+    async def __call__(self, debt_id: UUID) -> tuple[Debt, list[DebtInstallment], DebtBalance]:
         async with self.uow:
             debt = await self.uow.debts.get_debt(debt_id)
-            return debt, await self.uow.debts.installments(debt_id)
+            installments = await self.uow.debts.installments(debt_id)
+            paid = (await self.uow.payments.paid()).get(debt_id, ZERO)
+        return debt, installments, DebtBalance.of(installments, paid)
+
+
+@dataclass(frozen=True)
+class RegisterDebtPayment:
+    """Pago de una deuda o cobro de un préstamo: sale o entra de una cuenta en su moneda."""
+
+    uow: DebtsUnitOfWork
+
+    async def __call__(self, payment: DebtPayment) -> DebtPayment:
+        async with self.uow:
+            debt = await self.uow.debts.get_debt(payment.debt_id)
+            paid = (await self.uow.payments.paid()).get(debt.id, ZERO)
+            pending = DebtBalance.of(await self.uow.debts.installments(debt.id), paid).pending
+            if payment.amount > pending:
+                raise InvalidPaymentError(f"Falta pagar {pending} {debt.currency}")
+            account = await self.uow.cash.account(payment.account_id)
+            if account.archived or account.currency is not debt.currency:
+                raise InvalidPaymentError(f"Se paga desde una cuenta activa en {debt.currency}")
+            await self.uow.payments.add(payment)
+            # Decisión del PO: sin categoría, como el pago de la tarjeta; no es gasto ni ingreso.
+            lent = debt.direction is DebtDirection.LENT
+            await self.uow.cash.record_trade(
+                payment.account_id,
+                payment.amount,
+                incoming=lent,
+                on=payment.date,
+                trade_id=payment.id,
+                description=f"{'Cobro de' if lent else 'Pago a'} {debt.counterparty}",
+            )
+            await self.uow.commit()
+        return payment

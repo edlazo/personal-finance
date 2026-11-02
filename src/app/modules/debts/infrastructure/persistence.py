@@ -1,15 +1,18 @@
 """Tablas, repositorio y Unit of Work de las deudas."""
 
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Self
 from uuid import UUID, uuid4
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Numeric, SmallInteger, String, select
+from sqlalchemy import Date, DateTime, Enum, ForeignKey, Numeric, SmallInteger, String, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.modules.debts.domain.debt import Debt, DebtDirection, DebtInstallment
+from app.modules.debts.domain.payment import DebtPayment
+from app.shared.domain.cash import CashMovements
 from app.shared.domain.money import Currency
 from app.shared.infrastructure.database import Base
 from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -115,14 +118,66 @@ class SqlAlchemyDebtRepository(UserScopedRepository[DebtModel]):
         ]
 
 
+class DebtPaymentModel(UserOwnedMixin, Base):
+    __tablename__ = "debt_payments"
+
+    debt_id: Mapped[UUID] = mapped_column(ForeignKey("debts.id"), index=True)
+    account_id: Mapped[UUID] = mapped_column(ForeignKey("accounts.id"))
+    amount: Mapped[Decimal] = mapped_column(Numeric(20, 2))
+    date: Mapped[date] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SqlAlchemyDebtPaymentRepository(UserScopedRepository[DebtPaymentModel]):
+    model = DebtPaymentModel
+
+    async def add(self, payment: DebtPayment) -> None:
+        self.session.add(
+            DebtPaymentModel(
+                id=payment.id,
+                user_id=payment.user_id,
+                debt_id=payment.debt_id,
+                account_id=payment.account_id,
+                amount=payment.amount,
+                date=payment.date,
+                created_at=payment.created_at,
+            )
+        )
+        await self.session.flush()
+
+    async def paid(self) -> dict[UUID, Decimal]:
+        m = DebtPaymentModel
+        query = (
+            select(m.debt_id, func.sum(m.amount))
+            .where(m.user_id == self.user_id)
+            .group_by(m.debt_id)
+        )
+        return dict((await self.session.execute(query)).all())
+
+
+# Lo arma main.py con la implementación de ledger (contrato de app.shared).
+CashMovementsFactory = Callable[[AsyncSession, UUID], CashMovements]
+
+
 class SqlAlchemyDebtsUnitOfWork(SqlAlchemyUnitOfWork):
     debts: SqlAlchemyDebtRepository
+    payments: SqlAlchemyDebtPaymentRepository
+    cash: CashMovements
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], user_id: UUID) -> None:
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        user_id: UUID,
+        cash: CashMovementsFactory,
+    ) -> None:
         super().__init__(session_factory)
         self._user_id = user_id
+        self._cash = cash
 
     async def __aenter__(self) -> Self:
         await super().__aenter__()
         self.debts = SqlAlchemyDebtRepository(self.session, self._user_id)
+        self.payments = SqlAlchemyDebtPaymentRepository(self.session, self._user_id)
+        # Misma sesión: el pago y su movimiento en la cuenta se confirman juntos.
+        self.cash = self._cash(self.session, self._user_id)
         return self
