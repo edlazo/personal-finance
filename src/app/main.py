@@ -24,6 +24,7 @@ from app.modules.investments.api.routes import (
 )
 from app.modules.investments.api.routes import router as instruments_router
 from app.modules.ledger.api.accounts import router as accounts_router
+from app.modules.ledger.api.recurring import router as recurring_router
 from app.modules.ledger.api.routes import router as categories_router
 from app.modules.ledger.api.transactions import router as transactions_router
 from app.modules.ledger.api.transfers import router as transfers_router
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(categories_router)
     app.include_router(transactions_router)
     app.include_router(transfers_router)
+    app.include_router(recurring_router)
     app.include_router(fx_router)
     app.include_router(instruments_router)
     app.include_router(trades_router)
