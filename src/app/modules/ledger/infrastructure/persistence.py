@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.modules.ledger.domain.category import Category, CategoryKind, CategoryNameTakenError
 from app.modules.ledger.infrastructure.accounts import SqlAlchemyAccountRepository
+from app.modules.ledger.infrastructure.recurring import SqlAlchemyRecurringRuleRepository
 from app.modules.ledger.infrastructure.transactions import SqlAlchemyTransactionRepository
 from app.shared.infrastructure.database import Base
 from app.shared.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -145,6 +146,7 @@ class SqlAlchemyLedgerUnitOfWork(SqlAlchemyUnitOfWork):
     accounts: SqlAlchemyAccountRepository
     categories: SqlAlchemyCategoryRepository
     transactions: SqlAlchemyTransactionRepository
+    recurring: SqlAlchemyRecurringRuleRepository
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession], user_id: UUID) -> None:
         super().__init__(session_factory)
@@ -155,4 +157,5 @@ class SqlAlchemyLedgerUnitOfWork(SqlAlchemyUnitOfWork):
         self.accounts = SqlAlchemyAccountRepository(self.session, self._user_id)
         self.categories = SqlAlchemyCategoryRepository(self.session, self._user_id)
         self.transactions = SqlAlchemyTransactionRepository(self.session, self._user_id)
+        self.recurring = SqlAlchemyRecurringRuleRepository(self.session, self._user_id)
         return self
