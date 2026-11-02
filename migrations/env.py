@@ -8,6 +8,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 import app.modules.cards.infrastructure.persistence
+import app.modules.debts.infrastructure.persistence
 import app.modules.fx.infrastructure.persistence
 import app.modules.identity.infrastructure.models
 import app.modules.investments.infrastructure.credentials
