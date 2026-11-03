@@ -1,6 +1,5 @@
 """Deudas y préstamos con su cronograma de cuotas mensuales."""
 
-from calendar import monthrange
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
@@ -8,6 +7,7 @@ from enum import StrEnum
 from typing import Protocol
 from uuid import UUID, uuid4
 
+from app.shared.domain.dates import add_months
 from app.shared.domain.errors import DomainError
 from app.shared.domain.money import Currency
 
@@ -23,12 +23,6 @@ class DebtDirection(StrEnum):
 
 class InvalidDebtError(DomainError):
     pass
-
-
-def add_months(start: date, months: int) -> date:
-    """El mismo día N meses después o, si el mes es más corto, su último día."""
-    year, index = divmod(start.year * 12 + start.month - 1 + months, 12)
-    return date(year, index + 1, min(start.day, monthrange(year, index + 1)[1]))
 
 
 def _cents(value: Decimal, rounding: str = ROUND_HALF_UP) -> Decimal:

@@ -17,7 +17,7 @@ class RecurringUnitOfWork(TransactionsUnitOfWork, Protocol):
     def recurring(self) -> RecurringRuleRepository: ...
 
 
-async def _check(uow: RecurringUnitOfWork, rule: RecurringRule) -> None:
+async def check_rule(uow: RecurringUnitOfWork, rule: RecurringRule) -> None:
     account = await uow.accounts.get_account(rule.account_id)
     check_movement(rule.kind, account, await uow.categories.get_category(rule.category_id))
 
@@ -28,7 +28,7 @@ class CreateRecurring:
 
     async def __call__(self, rule: RecurringRule) -> RecurringRule:
         async with self.uow:
-            await _check(self.uow, rule)
+            await check_rule(self.uow, rule)
             await self.uow.recurring.add(rule)
             await self.uow.commit()
         return rule
@@ -62,7 +62,7 @@ class UpdateRecurring:
             # replace() vuelve a validar el monto y las fechas.
             rule = replace(await self.uow.recurring.get_rule(rule_id), **changes)
             if MOVEMENT_FIELDS & changes.keys():
-                await _check(self.uow, rule)
+                await check_rule(self.uow, rule)
             await self.uow.recurring.save(rule)
             await self.uow.commit()
         return rule
