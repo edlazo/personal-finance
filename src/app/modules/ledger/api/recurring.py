@@ -8,7 +8,12 @@ from fastapi import APIRouter, status
 from pydantic import BaseModel, ConfigDict
 
 from app.modules.ledger.api.routes import LedgerUow
-from app.modules.ledger.api.transactions import Amount, Description
+from app.modules.ledger.api.transactions import Amount, Description, TransactionResponse
+from app.modules.ledger.application.generate_recurring import (
+    ConfirmPending,
+    DiscardPending,
+    ListPending,
+)
 from app.modules.ledger.application.manage_recurring import (
     CreateRecurring,
     DeleteRecurring,
@@ -31,6 +36,8 @@ class CreateRecurringRequest(BaseModel):
     start_date: dt.date
     end_date: dt.date | None = None
     description: Description = None
+    # true: cada ocurrencia queda pendiente, fuera del saldo, hasta confirmarla.
+    needs_confirmation: bool = False
 
 
 class UpdateRecurringRequest(BaseModel):
@@ -46,6 +53,7 @@ class UpdateRecurringRequest(BaseModel):
     description: Description = None
     # true pausa la regla; false la reanuda.
     paused: bool | None = None
+    needs_confirmation: bool | None = None
 
 
 class RecurringResponse(BaseModel):
@@ -61,6 +69,21 @@ class RecurringResponse(BaseModel):
     end_date: dt.date | None
     description: str | None
     paused: bool
+    needs_confirmation: bool
+
+
+class PendingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    rule_id: UUID
+    date: dt.date
+    amount: Decimal
+
+
+class ConfirmPendingRequest(BaseModel):
+    # Sin monto, se usa el de la ocurrencia.
+    amount: Amount | None = None
 
 
 # Los únicos campos que se pueden vaciar con null.
@@ -94,6 +117,38 @@ async def create_recurring(
 @router.get("", summary="Mis reglas recurrentes", description="Por fecha de inicio.")
 async def list_recurring(uow: LedgerUow) -> list[RecurringResponse]:
     return [RecurringResponse.model_validate(r) for r in await ListRecurring(uow=uow)()]
+
+
+# Antes que /{rule_id}: si no, "pending" se toma como un id.
+@router.get(
+    "/pending",
+    summary="Ocurrencias pendientes de confirmar",
+    description="No cuentan en saldos ni reportes hasta confirmarlas. Por fecha.",
+)
+async def list_pending(uow: LedgerUow) -> list[PendingResponse]:
+    return [PendingResponse.model_validate(p) for p in await ListPending(uow=uow)()]
+
+
+@router.post(
+    "/pending/{pending_id}/confirm",
+    status_code=status.HTTP_201_CREATED,
+    summary="Confirmar una ocurrencia pendiente",
+    description="Crea el movimiento con los datos actuales de la regla; el monto se puede ajustar.",
+)
+async def confirm_pending(
+    pending_id: UUID, body: ConfirmPendingRequest, uow: LedgerUow
+) -> TransactionResponse:
+    movement = await ConfirmPending(uow=uow)(pending_id, body.amount)
+    return TransactionResponse.model_validate(movement)
+
+
+@router.delete(
+    "/pending/{pending_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Descartar una ocurrencia pendiente",
+)
+async def discard_pending(pending_id: UUID, uow: LedgerUow) -> None:
+    await DiscardPending(uow=uow)(pending_id)
 
 
 @router.get("/{rule_id}", summary="Ver una regla recurrente")
