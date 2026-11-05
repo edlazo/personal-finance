@@ -5,8 +5,9 @@ from uuid import uuid4
 import pytest
 
 from app.modules.debts.application.manage_debts import CreateDebt, GetDebt, ListDebts
-from app.modules.debts.domain.debt import Debt, DebtDirection, InvalidDebtError, add_months
+from app.modules.debts.domain.debt import Debt, DebtDirection, InvalidDebtError
 from app.modules.debts.domain.payment import DebtBalance
+from app.shared.domain.dates import add_months
 from app.shared.domain.money import Currency
 from fakes.debts import FakeDebtsUnitOfWork
 

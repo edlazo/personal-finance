@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.modules.identity.domain.user import User
 from app.modules.identity.infrastructure.persistence import SqlAlchemyIdentityUnitOfWork
+from app.modules.ledger.application.generate_recurring import (
+    ConfirmPending,
+    GenerateRecurring,
+    ListPending,
+)
 from app.modules.ledger.application.manage_recurring import (
     CreateRecurring,
     DeleteRecurring,
@@ -62,5 +67,23 @@ async def test_rules_are_stored_edited_and_deleted_per_user(
 
     assert await ListRecurring(SqlAlchemyLedgerUnitOfWork(factory, ana))() == [paused]
     assert await ListRecurring(SqlAlchemyLedgerUnitOfWork(factory, beto))() == []
-    await DeleteRecurring(SqlAlchemyLedgerUnitOfWork(factory, ana))(rule.id)
-    assert await ListRecurring(SqlAlchemyLedgerUnitOfWork(factory, ana))() == []
+
+    def ledger(user: UUID = ana) -> SqlAlchemyLedgerUnitOfWork:
+        return SqlAlchemyLedgerUnitOfWork(factory, user)
+
+    await UpdateRecurring(ledger())(rule.id, {"paused": False, "needs_confirmation": True})
+    assert await GenerateRecurring(ledger())(rule.id, date(2026, 12, 5)) == 2
+    # Editar la regla no pisa hasta dónde llegó el job.
+    await UpdateRecurring(ledger())(rule.id, {"amount": Decimal("1600000")})
+    assert await GenerateRecurring(ledger())(rule.id, date(2026, 12, 5)) == 0
+    async with ledger() as uow:
+        # Una corrida con la regla leída antes del avance no mueve nada.
+        assert not await uow.recurring.advance(rule, date(2027, 1, 5))
+
+    first, _ = await ListPending(ledger())()
+    assert await ListPending(ledger(beto))() == []
+    confirmed = await ConfirmPending(ledger())(first.id)
+    assert (confirmed.date, confirmed.amount) == (date(2026, 11, 5), Decimal("1500000"))
+    await DeleteRecurring(ledger())(rule.id)
+    assert await ListRecurring(ledger())() == []
+    assert await ListPending(ledger())() == []

@@ -1,5 +1,6 @@
 """Dobles en memoria para los casos de uso del ledger."""
 
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from types import TracebackType
@@ -7,7 +8,7 @@ from typing import Self
 from uuid import UUID
 
 from app.modules.ledger.domain.category import Category, CategoryKind
-from app.modules.ledger.domain.recurring import RecurringRule
+from app.modules.ledger.domain.recurring import PendingOccurrence, RecurringRule
 from app.modules.ledger.domain.transaction import Transaction, TransactionFilter
 from app.shared.domain.errors import NotFoundError
 from fakes.accounts import InMemoryAccounts
@@ -101,6 +102,7 @@ class InMemoryTransactions:
 class InMemoryRecurring:
     def __init__(self) -> None:
         self.items: dict[UUID, RecurringRule] = {}
+        self.pending: dict[UUID, PendingOccurrence] = {}
 
     async def add(self, rule: RecurringRule) -> None:
         self.items[rule.id] = rule
@@ -118,6 +120,27 @@ class InMemoryRecurring:
 
     async def delete(self, rule_id: UUID) -> None:
         del self.items[rule_id]
+
+    async def advance(self, rule: RecurringRule, until: date) -> bool:
+        stored = self.items[rule.id]
+        if stored.generated_until != rule.generated_until:
+            return False
+        self.items[rule.id] = replace(stored, generated_until=until)
+        return True
+
+    async def add_pending(self, pending: PendingOccurrence) -> None:
+        self.pending[pending.id] = pending
+
+    async def list_pending(self) -> list[PendingOccurrence]:
+        return sorted(self.pending.values(), key=lambda p: p.date)
+
+    async def get_pending(self, pending_id: UUID) -> PendingOccurrence:
+        if pending_id not in self.pending:
+            raise NotFoundError("El recurso no existe")
+        return self.pending[pending_id]
+
+    async def delete_pending(self, pending_id: UUID) -> None:
+        del self.pending[pending_id]
 
 
 class FakeLedgerUnitOfWork:
