@@ -7,7 +7,11 @@ from fastapi import FastAPI
 
 from app.config import Settings, get_settings
 from app.modules.cards.api.routes import router as cards_router
+from app.modules.cards.application.manage_cards import CardsNetWorth
+from app.modules.cards.infrastructure.persistence import SqlAlchemyCardsUnitOfWork
 from app.modules.debts.api.routes import router as debts_router
+from app.modules.debts.application.manage_debts import DebtsNetWorth
+from app.modules.debts.infrastructure.persistence import SqlAlchemyDebtsUnitOfWork
 from app.modules.fx.api.routes import router as fx_router
 from app.modules.fx.application.currency_converter import CurrencyConverter
 from app.modules.fx.infrastructure.persistence import SqlAlchemyFxUnitOfWork
@@ -23,12 +27,17 @@ from app.modules.investments.api.routes import (
     trades_router,
 )
 from app.modules.investments.api.routes import router as instruments_router
+from app.modules.investments.application.list_positions import InvestmentsNetWorth
+from app.modules.investments.infrastructure.persistence import SqlAlchemyInvestmentsUnitOfWork
 from app.modules.ledger.api.accounts import router as accounts_router
 from app.modules.ledger.api.recurring import router as recurring_router
 from app.modules.ledger.api.routes import router as categories_router
 from app.modules.ledger.api.transactions import router as transactions_router
 from app.modules.ledger.api.transfers import router as transfers_router
+from app.modules.ledger.application.manage_accounts import AccountsNetWorth
+from app.modules.ledger.infrastructure.accounts import SqlAlchemyAccountsUnitOfWork
 from app.modules.ledger.infrastructure.cash_movements import LedgerCashMovements
+from app.modules.reports.api.routes import router as reports_router
 from app.shared.api.health import router as health_router
 from app.shared.api.middleware import request_logging
 from app.shared.api.problems import register_problem_handlers
@@ -62,6 +71,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     # Con la sesión de investments: la operación y su movimiento van en una transacción.
     app.state.cash_movements = LedgerCashMovements
+    cash = LedgerCashMovements
+    # Cada módulo informa lo que tiene o debe el usuario para el patrimonio neto.
+    app.state.net_worth_sources = lambda session_factory, user_id: [
+        AccountsNetWorth(SqlAlchemyAccountsUnitOfWork(session_factory, user_id)),
+        InvestmentsNetWorth(SqlAlchemyInvestmentsUnitOfWork(session_factory, user_id, cash)),
+        CardsNetWorth(SqlAlchemyCardsUnitOfWork(session_factory, user_id, cash)),
+        DebtsNetWorth(SqlAlchemyDebtsUnitOfWork(session_factory, user_id, cash)),
+    ]
     app.middleware("http")(request_logging)
     register_problem_handlers(app)
     app.include_router(health_router)
@@ -81,6 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(brokers_router)
     app.include_router(cards_router)
     app.include_router(debts_router)
+    app.include_router(reports_router)
     return app
 
 

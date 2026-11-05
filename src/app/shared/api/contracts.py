@@ -13,11 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.shared.api.auth import CurrentUserId
 from app.shared.api.dependencies import get_session_factory
+from app.shared.domain.net_worth import NetWorthSource
 from app.shared.domain.rates import MoneyConverter, RatePreference
 
 SessionFactory = Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)]
 MoneyConverterFactory = Callable[[async_sessionmaker[AsyncSession], UUID], MoneyConverter]
 RatePreferenceFactory = Callable[[async_sessionmaker[AsyncSession]], RatePreference]
+NetWorthSourcesFactory = Callable[[async_sessionmaker[AsyncSession], UUID], list[NetWorthSource]]
 
 
 def get_money_converter(
@@ -32,5 +34,13 @@ def get_rate_preference(request: Request, session_factory: SessionFactory) -> Ra
     return factory(session_factory)
 
 
+def get_net_worth_sources(
+    request: Request, user_id: CurrentUserId, session_factory: SessionFactory
+) -> list[NetWorthSource]:
+    factory: NetWorthSourcesFactory = request.app.state.net_worth_sources
+    return factory(session_factory, user_id)
+
+
 Converter = Annotated[MoneyConverter, Depends(get_money_converter)]
 Preference = Annotated[RatePreference, Depends(get_rate_preference)]
+NetWorthSources = Annotated[list[NetWorthSource], Depends(get_net_worth_sources)]
