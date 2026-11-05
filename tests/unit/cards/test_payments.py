@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.modules.cards.application.manage_cards import (
+    CardsNetWorth,
     GetStatement,
     RegisterPayment,
     RegisterPurchase,
@@ -14,6 +15,7 @@ from app.modules.cards.domain.payment import CardPayment, InvalidPaymentError
 from app.modules.cards.domain.purchase import CardPurchase
 from app.shared.domain.cash import CashAccount
 from app.shared.domain.money import Currency
+from app.shared.domain.net_worth import NetWorthGroup, NetWorthItem
 from fakes.cards import FakeCardsUnitOfWork
 
 ANA = uuid4()
@@ -74,3 +76,13 @@ async def test_invalid_payments_are_rejected(
     with pytest.raises(InvalidPaymentError):
         await pay(uow, account, amount, currency)
     assert (uow.payments.items, uow.cash.recorded) == ([], [])
+
+
+async def test_net_worth_owes_every_pending_installment_minus_partial_payments() -> None:
+    uow = await card_with_a_purchase()
+    await pay(uow, PESOS, "300")
+
+    # Las dos cuotas de 500 (la de este resumen y la del próximo) menos lo pagado.
+    assert await CardsNetWorth(uow)() == [
+        NetWorthItem(NetWorthGroup.CARDS, Currency.ARS, Decimal("700.00"))
+    ]

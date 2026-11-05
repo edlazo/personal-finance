@@ -2,9 +2,11 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
+from app.modules.ledger.application.manage_accounts import AccountsNetWorth
 from app.modules.ledger.application.summarize_accounts import SummarizeAccounts
 from app.modules.ledger.domain.account import Account, AccountType
 from app.shared.domain.money import Currency
+from app.shared.domain.net_worth import NetWorthGroup, NetWorthItem
 from app.shared.domain.rates import RateType
 from fakes.accounts import FakeAccountsUnitOfWork
 
@@ -61,3 +63,14 @@ async def test_each_account_and_the_total_in_both_currencies() -> None:
     )
     assert (await summarize(USER, rate_type=RateType.MEP)).rate_type is RateType.MEP
     assert converter.rate_types == {RateType.BLUE, RateType.MEP}
+
+
+async def test_net_worth_counts_every_balance_even_in_archived_accounts() -> None:
+    uow = FakeAccountsUnitOfWork()
+    archived = Account(USER, "Vieja", AccountType.SAVINGS, Currency.USD, Decimal("100"))
+    archived.archive()
+    uow.accounts.items[archived.id] = archived
+
+    assert await AccountsNetWorth(uow)() == [
+        NetWorthItem(NetWorthGroup.ACCOUNTS, Currency.USD, Decimal("100"))
+    ]

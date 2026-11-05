@@ -12,6 +12,7 @@ from app.modules.ledger.domain.account import (
     AccountNameTakenError,
 )
 from app.shared.domain.money import Currency
+from app.shared.domain.net_worth import NetWorthGroup, NetWorthItem
 
 
 @dataclass(frozen=True)
@@ -84,3 +85,16 @@ class ArchiveAccount:
             account.archive()
             await self.uow.accounts.save(account)
             await self.uow.commit()
+
+
+@dataclass(frozen=True)
+class AccountsNetWorth:
+    """Fuente del patrimonio: el saldo de cada cuenta, archivadas incluidas."""
+
+    uow: AccountsUnitOfWork
+
+    async def __call__(self) -> list[NetWorthItem]:
+        return [
+            NetWorthItem(NetWorthGroup.ACCOUNTS, a.account.currency, a.balance)
+            for a in await ListAccounts(uow=self.uow)(include_archived=True)
+        ]

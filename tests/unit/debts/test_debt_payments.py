@@ -4,11 +4,17 @@ from uuid import uuid4
 
 import pytest
 
-from app.modules.debts.application.manage_debts import CreateDebt, GetDebt, RegisterDebtPayment
+from app.modules.debts.application.manage_debts import (
+    CreateDebt,
+    DebtsNetWorth,
+    GetDebt,
+    RegisterDebtPayment,
+)
 from app.modules.debts.domain.debt import Debt, DebtDirection
 from app.modules.debts.domain.payment import DebtPayment, InvalidPaymentError
 from app.shared.domain.cash import CashAccount
 from app.shared.domain.money import Currency
+from app.shared.domain.net_worth import NetWorthGroup, NetWorthItem
 from fakes.debts import FakeDebtsUnitOfWork
 
 ANA = uuid4()
@@ -49,3 +55,14 @@ async def test_invalid_payments_are_rejected(
 ) -> None:
     with pytest.raises(InvalidPaymentError):
         await pay(DebtDirection.OWED, amount, currency, archived)
+
+
+async def test_net_worth_counts_what_is_left_of_loans_as_assets_and_debts_as_liabilities() -> None:
+    uow, _, _ = await pay(DebtDirection.LENT, "1000")
+    bank = Debt(ANA, "Banco", DebtDirection.OWED, Currency.USD, Decimal("600"), 3, date(2027, 1, 1))
+    await CreateDebt(uow)(bank)
+
+    assert set(await DebtsNetWorth(uow)()) == {
+        NetWorthItem(NetWorthGroup.LOANS, Currency.ARS, Decimal("2000.00")),
+        NetWorthItem(NetWorthGroup.DEBTS, Currency.USD, Decimal("600.00")),
+    }

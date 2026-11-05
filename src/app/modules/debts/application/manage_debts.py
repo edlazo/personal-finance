@@ -14,6 +14,7 @@ from app.modules.debts.domain.payment import (
 )
 from app.shared.application.unit_of_work import UnitOfWork
 from app.shared.domain.cash import CashMovements
+from app.shared.domain.net_worth import NetWorthGroup, NetWorthItem
 
 ZERO = Decimal("0.00")
 
@@ -98,3 +99,20 @@ class RegisterDebtPayment:
             )
             await self.uow.commit()
         return payment
+
+
+# Lo que me deben es activo; lo que debo, pasivo.
+GROUPS = {DebtDirection.LENT: NetWorthGroup.LOANS, DebtDirection.OWED: NetWorthGroup.DEBTS}
+
+
+@dataclass(frozen=True)
+class DebtsNetWorth:
+    """Fuente del patrimonio: lo que falta pagar de cada deuda o préstamo."""
+
+    uow: DebtsUnitOfWork
+
+    async def __call__(self) -> list[NetWorthItem]:
+        return [
+            NetWorthItem(GROUPS[debt.direction], debt.currency, balance.pending)
+            for debt, balance in await ListDebts(uow=self.uow)()
+        ]

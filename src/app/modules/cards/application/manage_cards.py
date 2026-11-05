@@ -18,6 +18,7 @@ from app.modules.cards.domain.purchase import (
 from app.shared.application.unit_of_work import UnitOfWork
 from app.shared.domain.cash import CashMovements
 from app.shared.domain.money import Currency
+from app.shared.domain.net_worth import NetWorthGroup, NetWorthItem
 
 
 class CardsUnitOfWork(UnitOfWork, Protocol):
@@ -76,6 +77,14 @@ class RegisterPurchase:
         return installments
 
 
+def _owed(installments: list[Installment]) -> dict[tuple[date, Currency], Decimal]:
+    """Lo que suma cada resumen, por moneda."""
+    owed: defaultdict[tuple[date, Currency], Decimal] = defaultdict(Decimal)
+    for i in installments:
+        owed[(i.closing_date, i.currency)] += i.amount
+    return owed
+
+
 @dataclass(frozen=True)
 class PendingInstallments:
     uow: CardsUnitOfWork
@@ -88,9 +97,7 @@ class PendingInstallments:
             await self.uow.cards.get_card(card_id)
             installments = await self.uow.purchases.card_installments(card_id)
             paid = await self.uow.payments.paid(card_id)
-        owed: defaultdict[tuple[date, Currency], Decimal] = defaultdict(Decimal)
-        for i in installments:
-            owed[(i.closing_date, i.currency)] += i.amount
+        owed = _owed(installments)
         return [
             i
             for i in installments
@@ -163,3 +170,20 @@ class RegisterPayment:
             )
             await self.uow.commit()
         return payment
+
+
+@dataclass(frozen=True)
+class CardsNetWorth:
+    """Fuente del patrimonio. Decisión del PO: todo lo que falta pagar, cuotas futuras incluidas."""
+
+    uow: CardsUnitOfWork
+
+    async def __call__(self) -> list[NetWorthItem]:
+        pending: defaultdict[Currency, Decimal] = defaultdict(Decimal)
+        async with self.uow:
+            for card in await self.uow.cards.list_cards():
+                paid = await self.uow.payments.paid(card.id)
+                installments = await self.uow.purchases.card_installments(card.id)
+                for (closing, currency), amount in _owed(installments).items():
+                    pending[currency] += amount - paid.get((closing, currency), Decimal("0"))
+        return [NetWorthItem(NetWorthGroup.CARDS, c, a) for c, a in pending.items()]

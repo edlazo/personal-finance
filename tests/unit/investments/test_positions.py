@@ -2,12 +2,13 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from app.modules.investments.application.list_positions import ListPositions
+from app.modules.investments.application.list_positions import InvestmentsNetWorth, ListPositions
 from app.modules.investments.domain.instrument import Instrument, InstrumentType, Market
 from app.modules.investments.domain.position import build_positions
 from app.modules.investments.domain.price import InstrumentPrice
 from app.modules.investments.domain.trade import Trade, TradeSide
 from app.shared.domain.money import Currency
+from app.shared.domain.net_worth import NetWorthGroup, NetWorthItem
 from app.shared.domain.rates import RateType
 from fakes.investments import FakeInvestmentsUnitOfWork
 
@@ -127,3 +128,13 @@ def test_money_without_movements_keeps_two_decimals() -> None:
 
     assert str(by_ticker["GGAL"].realized_pnl) == "0.00"
     assert str(by_ticker["AL30"].unrealized_pnl_pct) == "0.00"
+
+
+async def test_net_worth_values_each_position_in_its_currency() -> None:
+    uow = FakeInvestmentsUnitOfWork()
+    uow.instruments.items.append(GGAL)
+    uow.trades.items.append(trade(GGAL, BUY, "10", "1000"))
+
+    assert await InvestmentsNetWorth(uow)() == [
+        NetWorthItem(NetWorthGroup.INVESTMENTS, Currency.ARS, Decimal("10000.00"))
+    ]
